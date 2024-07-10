@@ -12,3 +12,7 @@ docs/
 
 # Dotenv file
 .env
+
+# Library files
+lib
+lib/*
