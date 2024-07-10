@@ -21,17 +21,6 @@ contract DefiStableCoin is ERC20Burnable, Ownable {
 
     constructor(address _owner) ERC20('Ballast', 'BAL') Ownable(_owner) {}
 
-    function burn(uint256 _amount) public override onlyOwner {
-        uint256 balance = balanceOf(msg.sender);
-        if (_amount <= 0) {
-            revert DefiStableCoin__AmountMustBeMoreThanZero();
-        }
-        if (balance < _amount) {
-            revert DefiStableCoin__BurnAmountExceedsBalance();
-        }
-        super.burn(_amount);
-    }
-
     function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {
         if (_to == address(0)) {
             revert DefiStableCoin__NotZeroAddress();
@@ -41,5 +30,16 @@ contract DefiStableCoin is ERC20Burnable, Ownable {
         }
         _mint(_to, _amount);
         return true;
+    }
+
+    function burn(uint256 _amount) public override onlyOwner {
+        uint256 balance = balanceOf(msg.sender);
+        if (_amount <= 0) {
+            revert DefiStableCoin__AmountMustBeMoreThanZero();
+        }
+        if (balance < _amount) {
+            revert DefiStableCoin__BurnAmountExceedsBalance();
+        }
+        super.burn(_amount);
     }
 }
