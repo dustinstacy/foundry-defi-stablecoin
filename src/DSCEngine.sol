@@ -88,6 +88,9 @@ contract DSCEngine is ReentrancyGuard {
     /// @dev Emitted if user's health factor is broken
     error DSCEngine__BreaksHealthFactor();
 
+    /// @dev Emitted if minting is unsuccesful
+    error DSCEngine__MintFailed();
+
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
@@ -151,6 +154,10 @@ contract DSCEngine is ReentrancyGuard {
     function mintDSC(uint256 amountDSCToMint) external moreThanZero(amountDSCToMint) nonReentrant {
         dscMinted[msg.sender] += amountDSCToMint;
         _revertIfHealthFactorIsBroken(msg.sender);
+        bool minted = i_dsc.mint(msg.sender, amountDSCToMint);
+        if (!minted) {
+            revert DSCEngine__MintFailed();
+        }
     }
 
     function redeemCollateralForDSC() external {}
