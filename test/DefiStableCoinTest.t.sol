@@ -17,37 +17,43 @@ contract DefiStableCoinTest is Test {
         vm.deal(USER, 1 ether);
     }
 
-    function testConstructorSetsNameAndSymbolCorrectly() public view {
+    ///
+    /// Constructor
+    ///
+    function test_ConstructorSetsNameAndSymbolCorrectly() public view {
         string memory expectedName = 'Ballast';
         string memory expectedSymbol = 'BAL';
         assertEq(dsc.name(), expectedName);
         assertEq(dsc.symbol(), expectedSymbol);
     }
 
-    function testConstructorSetsOwnerProperly() public view {
+    function test_ConstructorSetsOwnerProperly() public view {
         address expectedOwner = DEFAULT_SENDER;
         assertEq(dsc.owner(), expectedOwner);
     }
 
-    function testMintOnlyCallableByOwner() public {
+    ///
+    /// Mint
+    ///
+    function test_RevertIf_MintCallerIsNotTheOwner() public {
         vm.prank(USER);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, USER));
         dsc.mint(USER, mintAmount);
     }
 
-    function testMintCanNotBeToZeroAddress() public {
+    function test_RevertIf_ToAddressIsZero() public {
         vm.prank(DEFAULT_SENDER);
         vm.expectRevert(DefiStableCoin.DefiStableCoin__NotZeroAddress.selector);
         dsc.mint(address(0), mintAmount);
     }
 
-    function testMintAmountMustBeGreaterThanZero() public {
+    function test_RevertIf_MintAmountIsZero() public {
         vm.prank(DEFAULT_SENDER);
         vm.expectRevert(DefiStableCoin.DefiStableCoin__AmountMustBeMoreThanZero.selector);
         dsc.mint(DEFAULT_SENDER, 0);
     }
 
-    function testMintsTheRightAmountToTheCorrectAddress() public {
+    function test_MintsTheRightAmountToTheCorrectAddress() public {
         uint256 startingBalance = dsc.balanceOf(DEFAULT_SENDER);
         vm.prank(DEFAULT_SENDER);
         dsc.mint(DEFAULT_SENDER, mintAmount);
@@ -55,19 +61,22 @@ contract DefiStableCoinTest is Test {
         assertEq(startingBalance + mintAmount, endingBalance);
     }
 
-    function testBurnOnlyCallableByOwner() public {
+    ///
+    /// Burn
+    ///
+    function test_RevertIf_BurnCallerIsNotTheOwner() public {
         vm.prank(USER);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, USER));
         dsc.mint(USER, mintAmount);
     }
 
-    function testBurnAmountMustBeGreaterThanZero() public {
+    function test_RevertIf_BurnAmountIsZero() public {
         vm.prank(DEFAULT_SENDER);
         vm.expectRevert(DefiStableCoin.DefiStableCoin__AmountMustBeMoreThanZero.selector);
         dsc.burn(0);
     }
 
-    function testBurnAmountCannotExceedBalance() public {
+    function test_RevertIf_BurnAmountExceedsUserBalance() public {
         vm.prank(DEFAULT_SENDER);
         vm.expectRevert(DefiStableCoin.DefiStableCoin__BurnAmountExceedsBalance.selector);
         dsc.burn(burnAmount);
