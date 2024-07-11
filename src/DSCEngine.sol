@@ -17,19 +17,16 @@ import { AggregatorV3Interface } from '@chainlink/contracts/interfaces/Aggregato
 /// - Dollar Pegged
 /// - Algorithmically Stable
 ///
-/// Is is similar to DAI if DAI had no governance, no fees
+/// Iy is similar to DAI if DAI had no governance, no fees
 /// and was only backed by WETH and WBTC
 ///
 /// Our DSC system should always be "overcollateralized".
-/// At no point, should the value of all collateral <==
+/// At no point, should the value of all collateral <=
 /// the $ backed value of all the DSC.
 ///
-/// @notice This contract is the core of the DSC System. It
-/// handles all the logic for mining and redeeming DSC, as
+/// This contract is the core of the DSC System. It
+/// handles all the logic for minting and redeeming DSC, as
 /// well as depositing & withdrawing collateral.
-/// @notice This contract is VERY loosely based on the MakerDAO
-/// DSS (DAI) system.
-///
 contract DSCEngine is ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -37,33 +34,52 @@ contract DSCEngine is ReentrancyGuard {
 
     DefiStableCoin private immutable i_dsc;
 
+    /// @dev constant variable to adjust price feed decimals for math related purposes
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+
+    /// @dev constant variable used i
     uint256 private constant PRECISION = 1e18;
 
+    /// @dev Mapping from token address to its price feed address.
     mapping(address token => address priceFeed) private priceFeeds;
+
+    /// @dev Mapping from user address to a mapping of their collateral by token address
     mapping(address user => mapping(address token => uint256 amount)) private collateralDeposited;
+
+    /// @dev Mapping from user address to their minted DSC balances.
     mapping(address user => uint256 amountDSCMinted) private dscMinted;
+
+    /// @dev Array of all supported collateral tokens.
     address[] private collateralTokens;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Emitted when collateral is deposited.
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Emitted when attempting to perform an action with an amount that must be more than zero.
     error DSCEngine__AmountMustBeMoreThanZero();
+
+    /// @dev Emitted when attempting to use array arguments that are not the same length
     error DSCEngine__ArraysMustBeSameLength();
+
+    /// @dev Emitted when an unallowed token address is passed as an argument
     error DSCEngine__TokenNotAllowed();
+
+    /// @dev Emitted when a token transfer is unsuccesful
     error DSCEngine__TransferFailed();
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Ensures that the amount passed is more than zero.
     modifier moreThanZero(uint256 amount) {
         if (amount == 0) {
             revert DSCEngine__AmountMustBeMoreThanZero();
@@ -71,6 +87,7 @@ contract DSCEngine is ReentrancyGuard {
         _;
     }
 
+    /// @dev Ensures that the token is allowed for collateral
     modifier isAllowedToken(address token) {
         if (priceFeeds[token] == address(0)) {
             revert DSCEngine__TokenNotAllowed();
@@ -82,6 +99,9 @@ contract DSCEngine is ReentrancyGuard {
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @param tokenAddresses Array of collateral token addresses.
+    /// @param priceFeedAddresses Array of corresponding price feed addresses.
+    /// @param dscAddress Address of the DefiStableCoin contract.
     constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
         if (tokenAddresses.length <= priceFeedAddresses.length) {
             revert DSCEngine__ArraysMustBeSameLength();
@@ -99,10 +119,8 @@ contract DSCEngine is ReentrancyGuard {
 
     function depositCollateralAndMintDSC() external {}
 
-    ///
     /// @param tokenCollateralAddress the address of the token to deposit as collateral
     /// @param amountCollateral the amount of collateral to deposit
-    ///
     function depositCollateral(
         address tokenCollateralAddress,
         uint256 amountCollateral
@@ -115,10 +133,8 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    ///
     /// @param amountDSCToMint The amount of defi stablecoin to mint
     /// @notice they must have more collateral value than minimum threshold
-    ///
     function mintDSC(uint256 amountDSCToMint) external moreThanZero(amountDSCToMint) nonReentrant {
         dscMinted[msg.sender] += amountDSCToMint;
         _revertIfHealthFactorIsBroken(msg.sender);
@@ -138,6 +154,9 @@ contract DSCEngine is ReentrancyGuard {
                             PUBLIC FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Function to calculate the total value of collateral deposited by a user in USD.
+    /// @param user The user's address.
+    /// @return totalCollateralValueInUSD Total value of collateral in USD.
     function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralValueInUSD) {
         for (uint256 i = 0; i < collateralTokens.length; i++) {
             address token = collateralTokens[i];
@@ -147,6 +166,10 @@ contract DSCEngine is ReentrancyGuard {
         return totalCollateralValueInUSD;
     }
 
+    /// @dev Function to calculate the USD value of a given amount of collateral.
+    /// @param token The token address.
+    /// @param amount The amount of collateral tokens.
+    /// @return usdValue The USD value of the collateral amount.
     function getUSDValue(address token, uint256 amount) public view returns (uint256 usdValue) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeeds[token]);
         (, int256 price, , , ) = priceFeed.latestRoundData();
@@ -163,6 +186,9 @@ contract DSCEngine is ReentrancyGuard {
                            PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @param user The user's address.
+    /// @return totalDSCMinted Total DSC minted by the user.
+    /// @return collateralValueInUSD Total collateral value in USD.
     function _getAccountInformation(
         address user
     ) private view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
