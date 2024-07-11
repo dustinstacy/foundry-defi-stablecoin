@@ -32,13 +32,23 @@ contract DSCEngine is ReentrancyGuard {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Instance of the DefiStableCoin contract used for interacting with the DSC token.
     DefiStableCoin private immutable i_dsc;
 
-    /// @dev constant variable to adjust price feed decimals for math related purposes
+    /// @dev Used to adjust decimals of price feed results
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
 
-    /// @dev constant variable used i
+    /// @dev Used to adjust decimals to relative USD value
     uint256 private constant PRECISION = 1e18;
+
+    /// @dev Threshold percentage for triggering account liquidation.
+    uint256 private constant LIQUIDATION_THRESHOLD = 50;
+
+    /// @dev Precision factor used for calculating liquidation threshold percentage.
+    uint256 private constant LIQUIDATION_PRECISION = 100;
+
+    /// @dev Minimum acceptable health factor to avoid liquidation.
+    uint256 private constant MIN_HEALTH_FACTOR = 1;
 
     /// @dev Mapping from token address to its price feed address.
     mapping(address token => address priceFeed) private priceFeeds;
@@ -74,6 +84,9 @@ contract DSCEngine is ReentrancyGuard {
 
     /// @dev Emitted when a token transfer is unsuccesful
     error DSCEngine__TransferFailed();
+
+    /// @dev Emitted if user's health factor is broken
+    error DSCEngine__BreaksHealthFactor();
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -167,6 +180,9 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     /// @dev Function to calculate the USD value of a given amount of collateral.
+    /// @notice Retrieves the latest price from the Chainlink price feed using `latestRoundData()`,
+    /// which returns a value with 8 decimals. To increase precision, `ADDITIONAL_FEED_PRECISION`
+    /// is used to scale the price to 18 decimals before dividing by `PRECISION` to obtain the USD value.
     /// @param token The token address.
     /// @param amount The amount of collateral tokens.
     /// @return usdValue The USD value of the collateral amount.
@@ -180,7 +196,12 @@ contract DSCEngine is ReentrancyGuard {
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _revertIfHealthFactorIsBroken(address user) internal view {}
+    function _revertIfHealthFactorIsBroken(address user) internal view {
+        uint256 userHealthFactor = _healthFactor(user);
+        if (userHealthFactor < MIN_HEALTH_FACTOR) {
+            revert DSCEngine__BreaksHealthFactor();
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////
                            PRIVATE FUNCTIONS
@@ -196,11 +217,14 @@ contract DSCEngine is ReentrancyGuard {
         collateralValueInUSD = getAccountCollateralValue(user);
     }
 
-    ///
-    /// Returns how close to liquidation the user is
-    /// If a user goes below 1, they can get liquidated
-    ///
-    function _healthFactor(address user) private view returns (uint256) {
+    /// @dev Calculates the health factor of a user's account in the DSCEngine contract.
+    /// @notice The health factor indicates how close the user is to liquidation.
+    /// A health factor below 1 signifies the user is eligible for liquidation.
+    /// @param user The address of the user account.
+    /// @return healthFactor The calculated health factor.
+    function _healthFactor(address user) private view returns (uint256 healthFactor) {
         (uint256 totalDSCMinted, uint256 collateralValueInUSD) = _getAccountInformation(user);
+        uint256 collateralAdjustedForThreshold = (collateralValueInUSD * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+        return healthFactor = (collateralAdjustedForThreshold * PRECISION) / totalDSCMinted;
     }
 }
