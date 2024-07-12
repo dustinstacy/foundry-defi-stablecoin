@@ -108,15 +108,31 @@ contract DSCEngineTest is Test {
                                 MINT DSC
     //////////////////////////////////////////////////////////////*/
 
-    function test_RevertsIf_MintAmountIsZero() public {}
+    modifier mintDSC() {
+        vm.startPrank(user);
+        dscEngine.mintDSC(mintAmount);
+        vm.stopPrank();
+        _;
+    }
 
-    function test_SetsUserDSCMintedProperly() public {}
+    function test_RevertsIf_MintAmountIsZero() public depositCollateral {
+        vm.expectRevert(DSCEngine.DSCEngine__AmountMustBeMoreThanZero.selector);
+        dscEngine.mintDSC(0);
+    }
 
-    function test_RevertsIf_HealthFactorIsBroken() public {}
+    function test_SetsUserDSCMintedProperly() public depositCollateral mintDSC {
+        uint256 userDSCMinted = dscEngine.getDSCMinted(user);
+        assertEq(userDSCMinted, collateralAmount);
+    }
 
-    function test_MintsCorrectAmountToUsersAddress() public {}
+    function test_RevertsIf_HealthFactorIsBroken() public depositCollateral {}
 
-    function test_RevertsWhen_MintFails() public {}
+    function test_MintsCorrectAmountToUsersAddress() public depositCollateral mintDSC {
+        uint256 userBalance = dsc.balanceOf(user);
+        assertEq(userBalance, collateralAmount);
+    }
+
+    function test_RevertsWhen_MintFails() public depositCollateral {}
 
     /*//////////////////////////////////////////////////////////////
                       GET ACCOUNT COLLATERAL VALUE

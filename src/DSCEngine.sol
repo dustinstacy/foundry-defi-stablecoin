@@ -217,6 +217,12 @@ contract DSCEngine is ReentrancyGuard {
         return collateralDeposited[user][token];
     }
 
+    /// @param user User address to retrieve minted defi stablecoin amount from.
+    /// @return Amount of DSC minted by the user.
+    function getDSCMinted(address user) public view returns (uint256) {
+        return dscMinted[user];
+    }
+
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
