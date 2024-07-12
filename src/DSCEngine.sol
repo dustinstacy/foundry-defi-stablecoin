@@ -76,19 +76,19 @@ contract DSCEngine is ReentrancyGuard {
     /// @dev Emitted when attempting to perform an action with an amount that must be more than zero.
     error DSCEngine__AmountMustBeMoreThanZero();
 
-    /// @dev Emitted when attempting to use array arguments that are not the same length
+    /// @dev Emitted when attempting to use array arguments that are not the same length.
     error DSCEngine__ArraysMustBeSameLength();
 
-    /// @dev Emitted when an unallowed token address is passed as an argument
+    /// @dev Emitted when an unallowed token address is passed as an argument.
     error DSCEngine__TokenNotAllowed();
 
-    /// @dev Emitted when a token transfer is unsuccesful
+    /// @dev Emitted when a token transfer is unsuccesful.
     error DSCEngine__TransferFailed();
 
-    /// @dev Emitted if user's health factor is broken
+    /// @dev Emitted if user's health factor is broken.
     error DSCEngine__BreaksHealthFactor();
 
-    /// @dev Emitted if minting is unsuccesful
+    /// @dev Emitted if minting is unsuccesful.
     error DSCEngine__MintFailed();
 
     /*//////////////////////////////////////////////////////////////
@@ -103,7 +103,7 @@ contract DSCEngine is ReentrancyGuard {
         _;
     }
 
-    /// @dev Ensures that the token is allowed for collateral
+    /// @dev Ensures that the token is allowed for collateral.
     modifier isAllowedToken(address token) {
         if (priceFeeds[token] == address(0)) {
             revert DSCEngine__TokenNotAllowed();
@@ -146,8 +146,8 @@ contract DSCEngine is ReentrancyGuard {
         mintDSC(amountDSCToMint);
     }
 
-    /// @param tokenCollateralAddress the address of the token to deposit as collateral
-    /// @param amountCollateral the amount of collateral to deposit
+    /// @param tokenCollateralAddress The address of the token to deposit as collateral.
+    /// @param amountCollateral The amount of collateral to deposit.
     function depositCollateral(
         address tokenCollateralAddress,
         uint256 amountCollateral
@@ -160,8 +160,8 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    /// @param amountDSCToMint The amount of defi stablecoin to mint
-    /// @notice they must have more collateral value than minimum threshold
+    /// @param amountDSCToMint The amount of defi stablecoin to mint.
+    /// @notice Minter must have more collateral value than the minimum threshold.
     function mintDSC(uint256 amountDSCToMint) public moreThanZero(amountDSCToMint) nonReentrant {
         dscMinted[msg.sender] += amountDSCToMint;
         _revertIfHealthFactorIsBroken(msg.sender);
@@ -238,6 +238,8 @@ contract DSCEngine is ReentrancyGuard {
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @param user User address to ensure it meets the minimum health factor.
+    /// @notice Reverts the function calling this function if the user's health factor is below 1.
     function _revertIfHealthFactorIsBroken(address user) internal view {
         uint256 userHealthFactor = _healthFactor(user);
         if (userHealthFactor < MIN_HEALTH_FACTOR) {
