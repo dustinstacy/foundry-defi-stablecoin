@@ -2,23 +2,23 @@
 pragma solidity ^0.8.20;
 
 import { ReentrancyGuard } from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import { DefiStableCoin } from './DefiStableCoin.sol';
 import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import { AggregatorV3Interface } from '@chainlink/contracts/interfaces/AggregatorV3Interface.sol';
+import { DefiStableCoin } from './DefiStableCoin.sol';
 
-///
 /// @title DSCEngine
 /// @author Dustin Stacy
 ///
-/// This system is designed to be as minimal as possible
-/// The token maintains a 1 token == $1 peg
+/// This system is designed to be as minimal as possible.
+/// The token maintains a 1 token == $1 peg.
 /// This stablecoin has the following properties:
-/// - Exongenous Collateral
-/// - Dollar Pegged
-/// - Algorithmically Stable
+/// - Exongenous Collateral.
+/// - Dollar Pegged.
+/// - Algorithmically Stable.
 ///
-/// Iy is similar to DAI if DAI had no governance, no fees
-/// and was only backed by WETH and WBTC
+///
+/// It is similar to DAI if DAI had no governance, no fees
+/// and was only backed by WETH and WBTC.
 ///
 /// Our DSC system should always be "overcollateralized".
 /// At no point, should the value of all collateral <=
@@ -35,10 +35,10 @@ contract DSCEngine is ReentrancyGuard {
     /// @dev Instance of the DefiStableCoin contract used for interacting with the DSC token.
     DefiStableCoin private immutable i_dsc;
 
-    /// @dev Used to adjust decimals of price feed results
+    /// @dev Used to adjust decimals of price feed results.
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
 
-    /// @dev Used to adjust decimals to relative USD value
+    /// @dev Used to adjust decimals to relative USD value.
     uint256 private constant PRECISION = 1e18;
 
     /// @dev Threshold percentage for triggering account liquidation.
@@ -53,7 +53,7 @@ contract DSCEngine is ReentrancyGuard {
     /// @dev Mapping from token address to its price feed address.
     mapping(address token => address priceFeed) private priceFeeds;
 
-    /// @dev Mapping from user address to a mapping of their collateral by token address
+    /// @dev Mapping from user address to a mapping of their collateral by token address.
     mapping(address user => mapping(address token => uint256 amount)) private collateralDeposited;
 
     /// @dev Mapping from user address to their minted DSC balances.
@@ -119,7 +119,7 @@ contract DSCEngine is ReentrancyGuard {
     /// @param priceFeedAddresses Array of corresponding price feed addresses.
     /// @param dscAddress Address of the DefiStableCoin contract.
     constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
-        if (tokenAddresses.length <= priceFeedAddresses.length) {
+        if (tokenAddresses.length != priceFeedAddresses.length) {
             revert DSCEngine__ArraysMustBeSameLength();
         }
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
@@ -197,6 +197,17 @@ contract DSCEngine is ReentrancyGuard {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeeds[token]);
         (, int256 price, , , ) = priceFeed.latestRoundData();
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
+    }
+
+    /// @return Array of token addresses allowed as collateral.
+    function getCollateralTokens() public view returns (address[] memory) {
+        return collateralTokens;
+    }
+
+    /// @param token Token address to get the price feed address of.
+    /// @return priceFeed Tokens price feed address.
+    function getPriceFeedAddress(address token) public view returns (address priceFeed) {
+        return priceFeeds[token];
     }
 
     /*//////////////////////////////////////////////////////////////
