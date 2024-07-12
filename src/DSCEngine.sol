@@ -133,14 +133,25 @@ contract DSCEngine is ReentrancyGuard {
                            EXTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function depositCollateralAndMintDSC() external {}
+    /// @param tokenCollateralAddress The address of the token to deposit as collateral.
+    /// @param amountCollateral The amount of collateral to deposit.
+    /// @param amountDSCToMint The amount of defi stablecoin to mint.
+    /// @notice This function will deposit your collateral and mint DSC in one transaction.
+    function depositCollateralAndMintDSC(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDSCToMint
+    ) external {
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        mintDSC(amountDSCToMint);
+    }
 
     /// @param tokenCollateralAddress the address of the token to deposit as collateral
     /// @param amountCollateral the amount of collateral to deposit
     function depositCollateral(
         address tokenCollateralAddress,
         uint256 amountCollateral
-    ) external moreThanZero(amountCollateral) isAllowedToken(tokenCollateralAddress) nonReentrant {
+    ) public moreThanZero(amountCollateral) isAllowedToken(tokenCollateralAddress) nonReentrant {
         collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
         emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
@@ -151,7 +162,7 @@ contract DSCEngine is ReentrancyGuard {
 
     /// @param amountDSCToMint The amount of defi stablecoin to mint
     /// @notice they must have more collateral value than minimum threshold
-    function mintDSC(uint256 amountDSCToMint) external moreThanZero(amountDSCToMint) nonReentrant {
+    function mintDSC(uint256 amountDSCToMint) public moreThanZero(amountDSCToMint) nonReentrant {
         dscMinted[msg.sender] += amountDSCToMint;
         _revertIfHealthFactorIsBroken(msg.sender);
         bool minted = i_dsc.mint(msg.sender, amountDSCToMint);
