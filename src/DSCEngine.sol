@@ -204,10 +204,17 @@ contract DSCEngine is ReentrancyGuard {
         return collateralTokens;
     }
 
-    /// @param token Token address to get the price feed address of.
-    /// @return priceFeed Tokens price feed address.
-    function getPriceFeedAddress(address token) public view returns (address priceFeed) {
+    /// @param token Token to get the price feed address of.
+    /// @return Token's price feed address.
+    function getPriceFeedAddress(address token) public view returns (address) {
         return priceFeeds[token];
+    }
+
+    /// @param user User address to retrieve deposited collateral information from.
+    /// @param token Token to get the amount deposited of.
+    /// @return Amount of collateral deposited by the user.
+    function getCollateralDeposited(address user, address token) public view returns (uint256) {
+        return collateralDeposited[user][token];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -233,6 +240,7 @@ contract DSCEngine is ReentrancyGuard {
     ) private view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
         totalDSCMinted = dscMinted[user];
         collateralValueInUSD = getAccountCollateralValue(user);
+        return (totalDSCMinted, collateralValueInUSD);
     }
 
     /// @dev Calculates the health factor of a user's account in the DSCEngine contract.
