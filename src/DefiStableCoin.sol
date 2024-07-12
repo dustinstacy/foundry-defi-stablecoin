@@ -43,6 +43,7 @@ contract DefiStableCoin is ERC20Burnable, Ownable {
 
     /// @dev Function to burn tokens
     /// @param _amount The amount of tokens to burn
+    /// @inheritdoc ERC20Burnable
     function burn(uint256 _amount) public override onlyOwner {
         uint256 balance = balanceOf(msg.sender);
         if (_amount <= 0) {
