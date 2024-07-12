@@ -69,6 +69,9 @@ contract DSCEngine is ReentrancyGuard {
     /// @dev Emitted when collateral is deposited.
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
 
+    /// @dev Emitted when collateral is redeemed.
+    event CollateralRedeemed(address indexed user, uint256 indexed amount, address indexed token);
+
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -171,11 +174,48 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function redeemCollateralForDSC() external {}
+    /// @param tokenCollateralAddress Address of the collateral to redeem.
+    /// @param amountCollateral Amount of collateral to redeem.
+    /// @param amountDSCToBurn Amount of DSC to burn.
+    /// @notice This function burns DSC and redeems underlying collateral in one transaction
+    /// @dev `burnDSC` and `redeemCollateral` both run checks to ensure amounts are not 0.
+    /// @dev `redeemCollateral` will run a check to ensure user health factor is not broken.
+    function redeemCollateralForDSC(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDSCToBurn
+    ) external {
+        burnDSC(amountDSCToBurn);
+        redeemCollateral(tokenCollateralAddress, amountCollateral);
+    }
 
-    function redeemCollateral() external {}
+    /// @param tokenCollateralAddress Address of the collateral to redeem.
+    /// @param amountCollateral Amount of collateral to redeem.
+    /// @notice If statment should be unreachable as the IERC20 should revert on transfer fail.
+    function redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral
+    ) public moreThanZero(amountCollateral) nonReentrant {
+        collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemed(msg.sender, amountCollateral, tokenCollateralAddress);
+        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender, amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
-    function burnDSC() external {}
+    /// @param amount Amount of DSC to burn.
+    /// @notice Calls burn function from the DefiStableCoin contract.
+    function burnDSC(uint256 amount) public moreThanZero(amount) {
+        dscMinted[msg.sender] -= amount;
+        bool success = i_dsc.transferFrom(msg.sender, address(this), amount);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        i_dsc.burn(amount);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     function liquidate() external {}
 
