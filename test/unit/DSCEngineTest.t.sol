@@ -24,7 +24,7 @@ contract DSCEngineTest is Test {
     address[] public priceFeedAddresses;
     address public user = address(1);
     uint256 public collateralAmount = 10 ether;
-    uint256 public mintAmount = 100 ether;
+    uint256 public mintAmount = 10 ether;
 
     uint256 public constant STARTING_USER_BALANCE = 10 ether;
 
