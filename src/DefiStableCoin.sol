@@ -24,7 +24,7 @@ contract DefiStableCoin is ERC20Burnable, Ownable {
     error DefiStableCoin__NotZeroAddress();
 
     /// @param _owner The initial owner of the contract
-    constructor(address _owner) ERC20('Ballast', 'BAL') Ownable(_owner) {}
+    constructor(address _owner) ERC20('Defi StableCoin', 'DSC') Ownable(_owner) {}
 
     /// @dev Function to mint tokens
     /// @param _to The address that will receive the minted tokens

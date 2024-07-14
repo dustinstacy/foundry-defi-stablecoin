@@ -275,6 +275,15 @@ contract DSCEngine is ReentrancyGuard {
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
     }
 
+    /// @param token Address of token to get amount of based on USD value
+    /// @param usdAmountInWei USD value represented in <value>e18, adding 18 decimal places.
+    /// @return The quantity of tokens that a USD value would equal of the given token address.
+    function getTokenAmountFromUSD(address token, uint256 usdAmountInWei) public view returns (uint256) {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeeds[token]);
+        (, int price, , , ) = priceFeed.latestRoundData();
+        return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
+    }
+
     /// @return Array of token addresses allowed as collateral.
     function getCollateralTokens() public view returns (address[] memory) {
         return collateralTokens;
@@ -299,15 +308,6 @@ contract DSCEngine is ReentrancyGuard {
         return dscMinted[user];
     }
 
-    /// @param token Address of token to get amount of based on USD value
-    /// @param usdAmountInWei USD value represented in <value>e18, adding 18 decimal places.
-    /// @return The quantity of tokens that a USD value would equal of the given token address.
-    function getTokenAmountFromUSD(address token, uint256 usdAmountInWei) public view returns (uint256) {
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeeds[token]);
-        (, int price, , , ) = priceFeed.latestRoundData();
-        return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
-    }
-
     /// @param user User address to retrieve the health factor of.
     /// @return User's health factor.
     function getHealthFactor(address user) public view returns (uint256) {
@@ -322,6 +322,8 @@ contract DSCEngine is ReentrancyGuard {
     /// @param to Address to have the collateral redeemed to.
     /// @param tokenCollateralAddress Address of the collateral to redeem.
     /// @param amountCollateral Amount of collateral to redeem.
+    /// @dev Low-level internal function. Do not call unless the calling function is checking
+    /// for broken health factors.
     function _redeemCollateral(
         address from,
         address to,
@@ -339,6 +341,8 @@ contract DSCEngine is ReentrancyGuard {
     /// @param amount Amount of DSC to burn
     /// @param onBehalfOf Address of user that will have their DSC returned.
     /// @param dscFrom Address of user that will have their DSC burnt.
+    /// @dev Low-level internal function. Do not call unless the calling function is checking
+    /// for broken health factors.
     function _burnDSC(uint256 amount, address onBehalfOf, address dscFrom) internal {
         dscMinted[onBehalfOf] -= amount;
         bool success = i_dsc.transferFrom(dscFrom, address(this), amount);
