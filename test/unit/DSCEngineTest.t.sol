@@ -64,6 +64,13 @@ contract DSCEngineTest is Test {
                     DEPOSIT COLLATERAL AND MINT DSC
     //////////////////////////////////////////////////////////////*/
 
+    function test_DepositsCollateralToContractAndMintsDSCToUser() public depositCollateral mintDSC {
+        uint256 userBalance = dsc.balanceOf(user);
+        uint256 contractBalance = ERC20Mock(wETH).balanceOf(address(dscEngine));
+        assertEq(userBalance, mintAmount);
+        assertEq(contractBalance, collateralAmount);
+    }
+
     /*//////////////////////////////////////////////////////////////
                            DEPOSIT COLLATERAL
     //////////////////////////////////////////////////////////////*/
@@ -82,8 +89,9 @@ contract DSCEngineTest is Test {
     }
 
     function test_RevertsIf_UnallowedTokenIsDeposited() public {
+        ERC20Mock invalidToken = new ERC20Mock('INVALID', 'INV', DEFAULT_SENDER, collateralAmount);
         vm.expectRevert(DSCEngine.DSCEngine__TokenNotAllowed.selector);
-        dscEngine.depositCollateral(address(0x123), 1e18);
+        dscEngine.depositCollateral(address(invalidToken), collateralAmount);
     }
 
     function test_SetsUserCollatertalDepositedProperly() public depositCollateral {
@@ -161,9 +169,9 @@ contract DSCEngineTest is Test {
     /*//////////////////////////////////////////////////////////////
                              GET USD VALUE
     //////////////////////////////////////////////////////////////*/
-    function test_GetUSDValue() public view {
+    function test_GetsTheProperUSDValueFromTokenAmount() public view {
         uint256 ethAmount = 10e18;
-        // 10e18 * 2000 (Mock ETH_USD_PRICE) = 20000e18;
+        // 10e18 * 2000 (Mock ETH_USD_PRICE) = 20000e18
         uint256 expectedUSDValue = 20000e18;
         uint256 actualUSDValue = dscEngine.getUSDValue(wETH, ethAmount);
         assertEq(expectedUSDValue, actualUSDValue);
@@ -172,6 +180,14 @@ contract DSCEngineTest is Test {
     /*//////////////////////////////////////////////////////////////
                        GET TOKEN AMOUNT FROM USD
     //////////////////////////////////////////////////////////////*/
+
+    function test_GetsProperTokenAmountFromUSDValue() public view {
+        uint256 usdAmount = 20000e18;
+        // 20000e18 / 2000 (Mock ETH_USD_PRICE) = 10e18
+        uint256 expectedTokenAmount = 10e18;
+        uint256 actualTokenAmount = dscEngine.getTokenAmountFromUSD(wETH, usdAmount);
+        assertEq(expectedTokenAmount, actualTokenAmount);
+    }
 
     /*//////////////////////////////////////////////////////////////
                           GET COLLATERAL TOKEN
@@ -205,7 +221,13 @@ contract DSCEngineTest is Test {
                         _GET ACCOUNT INFORMATION
     //////////////////////////////////////////////////////////////*/
 
-    function test_RetrievesAccurateUserAccountInformation() public {}
+    function test_RetrievesAccurateUserAccountInformation() public depositCollateral {
+        (uint256 totalDSCMinted, uint256 collateralValueInUSD) = dscEngine.getAccountInformation(user);
+        uint256 expectedDSCMinted = 0;
+        uint256 expectedTokenCollateralAmount = dscEngine.getTokenAmountFromUSD(wETH, collateralValueInUSD);
+        assertEq(totalDSCMinted, expectedDSCMinted);
+        assertEq(collateralAmount, expectedTokenCollateralAmount);
+    }
 
     /*//////////////////////////////////////////////////////////////
                              _HEALTH FACTOR

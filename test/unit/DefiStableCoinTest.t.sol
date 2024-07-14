@@ -21,8 +21,8 @@ contract DefiStableCoinTest is Test {
     /// Constructor
     ///
     function test_ConstructorSetsNameAndSymbolCorrectly() public view {
-        string memory expectedName = 'Ballast';
-        string memory expectedSymbol = 'BAL';
+        string memory expectedName = 'Defi StableCoin';
+        string memory expectedSymbol = 'DSC';
         assertEq(dsc.name(), expectedName);
         assertEq(dsc.symbol(), expectedSymbol);
     }
