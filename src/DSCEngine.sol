@@ -47,8 +47,11 @@ contract DSCEngine is ReentrancyGuard {
     /// @dev Precision factor used for calculating liquidation threshold percentage.
     uint256 private constant LIQUIDATION_PRECISION = 100;
 
+    /// @dev Bonus percentage to be given to a user for liquidating another user.
+    uint256 private constant LIQUIDATION_BONUS = 10;
+
     /// @dev Minimum acceptable health factor to avoid liquidation.
-    uint256 private constant MIN_HEALTH_FACTOR = 1;
+    uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
     /// @dev Mapping from token address to its price feed address.
     mapping(address token => address priceFeed) private priceFeeds;
@@ -93,6 +96,9 @@ contract DSCEngine is ReentrancyGuard {
 
     /// @dev Emitted if minting is unsuccesful.
     error DSCEngine__MintFailed();
+
+    ///@dev Emittied if attempting to liquidate a user that does not have a broken health factor.
+    error DSCEngine__HealthFactorNotBroken();
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -217,7 +223,23 @@ contract DSCEngine is ReentrancyGuard {
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
-    function liquidate() external {}
+    /// @param tokenCollateralAddress Address of the collateral to liquidate.
+    /// @param user Address of the user to liquidate based on broken health factor.
+    /// @param debtToCover Amount of DSC to burn to cover debt.
+    /// @notice You can partially liquidate a user.
+    function liquidate(
+        address tokenCollateralAddress,
+        address user,
+        uint256 debtToCover
+    ) external moreThanZero(debtToCover) nonReentrant {
+        uint256 startingUserHealthFactor = _healthFactor(user);
+        if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
+            revert DSCEngine__HealthFactorNotBroken();
+        }
+        uint256 tokenAmountFromDebtCovered = getTokenAmountFromUSD(tokenCollateralAddress, debtToCover);
+        uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
+        uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
+    }
 
     function getHealthFactor() external view {}
 
@@ -272,6 +294,15 @@ contract DSCEngine is ReentrancyGuard {
     /// @return Amount of DSC minted by the user.
     function getDSCMinted(address user) public view returns (uint256) {
         return dscMinted[user];
+    }
+
+    /// @param token Address of token to get amount of based on USD value
+    /// @param usdAmountInWei USD value represented in <value>e18, adding 18 decimal places.
+    /// @return The quantity of tokens that a USD value would equal of the given token address.
+    function getTokenAmountFromUSD(address token, uint256 usdAmountInWei) public view returns (uint256) {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeeds[token]);
+        (, int price, , , ) = priceFeed.latestRoundData();
+        return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
 
     /*//////////////////////////////////////////////////////////////
