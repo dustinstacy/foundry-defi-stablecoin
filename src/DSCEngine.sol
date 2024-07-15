@@ -218,7 +218,6 @@ contract DSCEngine is ReentrancyGuard {
 
     /// @param tokenCollateralAddress Address of the collateral to redeem.
     /// @param amountCollateral Amount of collateral to redeem.
-    /// @notice If statment should be unreachable as the IERC20 should revert on transfer fail.
     function redeemCollateral(
         address tokenCollateralAddress,
         uint256 amountCollateral
@@ -348,6 +347,7 @@ contract DSCEngine is ReentrancyGuard {
     /// @param to Address to have the collateral redeemed to.
     /// @param tokenCollateralAddress Address of the collateral to redeem.
     /// @param amountCollateral Amount of collateral to redeem.
+    /// @notice If statment should be unreachable as the IERC20 should revert on transfer fail.
     /// @dev Low-level internal function. Do not call unless the calling function is checking
     /// for broken health factors.
     function _redeemCollateral(

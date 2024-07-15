@@ -26,10 +26,17 @@ contract DSCEngineTest is Test {
     address public user = address(1);
     uint256 public collateralAmount = 20 ether;
     uint256 public mintAmount = 10000 ether;
+    uint256 public redeemAmount = 5 ether;
 
     uint256 public constant STARTING_USER_BALANCE = 20 ether;
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
+    event CollateralRedeemed(
+        address indexed redeemedFrom,
+        address indexed redeemedTo,
+        address indexed token,
+        uint256 amount
+    );
 
     function setUp() public {
         deployer = new DeployDSCEngine();
@@ -123,8 +130,6 @@ contract DSCEngineTest is Test {
         assertEq(contractBalance, collateralAmount);
     }
 
-    function test_RevertsWhen_DepositTransferFails() public {}
-
     /*//////////////////////////////////////////////////////////////
                                 MINT DSC
     //////////////////////////////////////////////////////////////*/
@@ -153,8 +158,6 @@ contract DSCEngineTest is Test {
         assertEq(userBalance, mintAmount);
     }
 
-    function test_RevertsWhen_MintFails() public depositCollateral {}
-
     /*//////////////////////////////////////////////////////////////
                        REDEEM COLLATERAL FOR DSC
     //////////////////////////////////////////////////////////////*/
@@ -173,13 +176,46 @@ contract DSCEngineTest is Test {
         assertEq(userBalance, 0);
     }
 
+    function test_RevertsIf_BurnAmountIsZero() public {
+        vm.startPrank(user);
+        vm.expectRevert(DSCEngine.DSCEngine__AmountMustBeMoreThanZero.selector);
+        dscEngine.burnDSC(0);
+    }
+
     /*//////////////////////////////////////////////////////////////
                            REDEEM COLLATERAL
     //////////////////////////////////////////////////////////////*/
 
-    function test_SetsTheOriginalDepositersCollateralToCorrectAmount() public {}
+    function test_SetsTheOriginalDepositersCollateralToCorrectAmount() public depositCollateralAndMintDSC {
+        vm.prank(user);
+        dscEngine.redeemCollateral(wETH, redeemAmount);
+        uint256 userEndingCollateral = dscEngine.getCollateralDeposited(user, wETH);
+        uint256 expectedCollateral = collateralAmount - redeemAmount;
+        assertEq(userEndingCollateral, expectedCollateral);
+    }
 
-    function test_EmitsCollateralRedeemedEvent() public {}
+    function test_EmitsCollateralRedeemedEvent() public depositCollateralAndMintDSC {
+        vm.prank(user);
+        vm.expectEmit(true, true, true, true, address(dscEngine));
+        emit CollateralRedeemed(user, user, wETH, redeemAmount);
+        dscEngine.redeemCollateral(wETH, redeemAmount);
+    }
+
+    function test_TransfersTheCorrectAmountToTheCorrectAddress() public depositCollateralAndMintDSC {
+        uint256 userAddressStartingBalance = ERC20Mock(wETH).balanceOf(user);
+        vm.prank(user);
+        dscEngine.redeemCollateral(wETH, redeemAmount);
+        uint256 userAddressEndingBalance = ERC20Mock(wETH).balanceOf(user);
+        assertEq(userAddressEndingBalance, (userAddressStartingBalance + redeemAmount));
+    }
+
+    function test_CannotBeCalledIfItBreaksHealthFactor() public depositCollateralAndMintDSC {
+        uint256 alternateRedeemAmount = 15 ether;
+
+        vm.prank(user);
+        vm.expectRevert(DSCEngine.DSCEngine__BreaksHealthFactor.selector);
+        dscEngine.redeemCollateral(wETH, alternateRedeemAmount);
+    }
 
     /*//////////////////////////////////////////////////////////////
                                LIQUIDATE
@@ -188,6 +224,17 @@ contract DSCEngineTest is Test {
     /*//////////////////////////////////////////////////////////////
                       GET ACCOUNT COLLATERAL VALUE
     //////////////////////////////////////////////////////////////*/
+
+    function test_GetsTheProperTotalUSDValueOfAllDepositedCollateralByUser() public depositCollateralAndMintDSC {
+        vm.startPrank(user);
+        ERC20Mock(wBTC).approve(address(dscEngine), collateralAmount);
+        dscEngine.depositCollateral(wBTC, collateralAmount);
+        vm.stopPrank();
+        uint256 totalCollateralValueInUSD = dscEngine.getAccountCollateralValue(user);
+        uint256 expectedETHUSDValue = dscEngine.getUSDValue(wETH, collateralAmount);
+        uint256 expectedBTCUSDValue = dscEngine.getUSDValue(wBTC, collateralAmount);
+        assertEq(totalCollateralValueInUSD, (expectedETHUSDValue + expectedBTCUSDValue));
+    }
 
     /*//////////////////////////////////////////////////////////////
                              GET USD VALUE
