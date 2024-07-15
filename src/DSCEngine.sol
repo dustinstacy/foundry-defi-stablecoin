@@ -150,7 +150,7 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                           EXTERNAL FUNCTIONS
+                       EXTERNAL & PUBLIC FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @param tokenCollateralAddress The address of the token to deposit as collateral.
@@ -166,31 +166,6 @@ contract DSCEngine is ReentrancyGuard {
         mintDSC(amountDSCToMint);
     }
 
-    /// @param tokenCollateralAddress The address of the token to deposit as collateral.
-    /// @param amountCollateral The amount of collateral to deposit.
-    function depositCollateral(
-        address tokenCollateralAddress,
-        uint256 amountCollateral
-    ) public moreThanZero(amountCollateral) isAllowedToken(tokenCollateralAddress) nonReentrant {
-        collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
-        emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
-        bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
-        if (!success) {
-            revert DSCEngine__TransferFailed();
-        }
-    }
-
-    /// @param amountDSCToMint The amount of defi stablecoin to mint.
-    /// @notice Minter must have more collateral value than the minimum threshold.
-    function mintDSC(uint256 amountDSCToMint) public moreThanZero(amountDSCToMint) nonReentrant {
-        dscMinted[msg.sender] += amountDSCToMint;
-        _revertIfHealthFactorIsBroken(msg.sender);
-        bool minted = i_dsc.mint(msg.sender, amountDSCToMint);
-        if (!minted) {
-            revert DSCEngine__MintFailed();
-        }
-    }
-
     /// @param tokenCollateralAddress Address of the collateral to redeem.
     /// @param amountCollateral Amount of collateral to redeem.
     /// @param amountDSCToBurn Amount of DSC to burn.
@@ -204,26 +179,6 @@ contract DSCEngine is ReentrancyGuard {
     ) external {
         burnDSC(amountDSCToBurn);
         redeemCollateral(tokenCollateralAddress, amountCollateral);
-    }
-
-    /// @param amount Amount of DSC to burn.
-    /// @notice Calls burn function from the DefiStableCoin contract.
-    function burnDSC(uint256 amount) public moreThanZero(amount) {
-        if (dscMinted[msg.sender] < amount) {
-            revert DSCEngine__InsufficientBalanceToBurn();
-        }
-        _burnDSC(amount, msg.sender, msg.sender);
-        _revertIfHealthFactorIsBroken(msg.sender);
-    }
-
-    /// @param tokenCollateralAddress Address of the collateral to redeem.
-    /// @param amountCollateral Amount of collateral to redeem.
-    function redeemCollateral(
-        address tokenCollateralAddress,
-        uint256 amountCollateral
-    ) public moreThanZero(amountCollateral) nonReentrant {
-        _redeemCollateral(msg.sender, msg.sender, tokenCollateralAddress, amountCollateral);
-        _revertIfHealthFactorIsBroken(msg.sender);
     }
 
     /// @param tokenCollateralAddress Address of the collateral to liquidate.
@@ -251,9 +206,50 @@ contract DSCEngine is ReentrancyGuard {
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            PUBLIC FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    /// @param tokenCollateralAddress The address of the token to deposit as collateral.
+    /// @param amountCollateral The amount of collateral to deposit.
+    function depositCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral
+    ) public moreThanZero(amountCollateral) isAllowedToken(tokenCollateralAddress) nonReentrant {
+        collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
+        emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
+        bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+    }
+
+    /// @param amountDSCToMint The amount of defi stablecoin to mint.
+    /// @notice Minter must have more collateral value than the minimum threshold.
+    function mintDSC(uint256 amountDSCToMint) public moreThanZero(amountDSCToMint) nonReentrant {
+        dscMinted[msg.sender] += amountDSCToMint;
+        _revertIfHealthFactorIsBroken(msg.sender);
+        bool minted = i_dsc.mint(msg.sender, amountDSCToMint);
+        if (!minted) {
+            revert DSCEngine__MintFailed();
+        }
+    }
+
+    /// @param amount Amount of DSC to burn.
+    /// @notice Calls burn function from the DefiStableCoin contract.
+    function burnDSC(uint256 amount) public moreThanZero(amount) {
+        if (dscMinted[msg.sender] < amount) {
+            revert DSCEngine__InsufficientBalanceToBurn();
+        }
+        _burnDSC(amount, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    /// @param tokenCollateralAddress Address of the collateral to redeem.
+    /// @param amountCollateral Amount of collateral to redeem.
+    function redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral
+    ) public moreThanZero(amountCollateral) nonReentrant {
+        _redeemCollateral(msg.sender, msg.sender, tokenCollateralAddress, amountCollateral);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     /// @dev Function to calculate the total value of collateral deposited by a user in USD.
     /// @param user The user's address.
@@ -289,44 +285,88 @@ contract DSCEngine is ReentrancyGuard {
         return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
 
+    /// @notice Exposes the internal `_calculateHealthFactor`.
+    /// @param totalDSCMinted Total DSC minted by the user.
+    /// @param collateralValueInUSD The total collateral value in USD
+    /// @return healthFactor The calculated health factor.
+    function calculateHealthFactor(
+        uint256 totalDSCMinted,
+        uint256 collateralValueInUSD
+    ) external pure returns (uint256 healthFactor) {
+        return healthFactor = _calculateHealthFactor(totalDSCMinted, collateralValueInUSD);
+    }
+
     /// @return Array of token addresses allowed as collateral.
-    function getCollateralTokens() public view returns (address[] memory) {
+    function getCollateralTokens() external view returns (address[] memory) {
         return collateralTokens;
     }
 
     /// @param token Token to get the price feed address of.
     /// @return Token's price feed address.
-    function getPriceFeedAddress(address token) public view returns (address) {
+    function getPriceFeedAddress(address token) external view returns (address) {
         return priceFeeds[token];
     }
 
     /// @param user User address to retrieve deposited collateral information from.
     /// @param token Token to get the amount deposited of.
     /// @return Amount of collateral deposited by the user.
-    function getCollateralDeposited(address user, address token) public view returns (uint256) {
+    function getCollateralDeposited(address user, address token) external view returns (uint256) {
         return collateralDeposited[user][token];
     }
 
     /// @param user User address to retrieve minted defi stablecoin amount from.
     /// @return Amount of DSC minted by the user.
-    function getDSCMinted(address user) public view returns (uint256) {
+    function getDSCMinted(address user) external view returns (uint256) {
         return dscMinted[user];
     }
 
     /// @param user User address to retrieve the health factor of.
     /// @return User's health factor.
-    function getHealthFactor(address user) public view returns (uint256) {
+    function getHealthFactor(address user) external view returns (uint256) {
         return _healthFactor(user);
     }
 
+    /// @param user User address to retrieve account information of.
+    /// @return totalDSCMinted Total amount of DSC minted by the user.
+    /// @return collateralValueInUSD Total value of all user collateral in USD.
     function getAccountInformation(
         address user
-    ) public view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
+    ) external view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
         return _getAccountInformation(user);
     }
 
+    /// @return The `LIQUIDATION_THRESHOLD` constant
+    function getLiquidationThreshold() external pure returns (uint256) {
+        return LIQUIDATION_THRESHOLD;
+    }
+
+    /// @return The `LIQUIDATION_BONUS` constant
+    function getLiquidationBonus() external pure returns (uint256) {
+        return LIQUIDATION_BONUS;
+    }
+
+    /// @return The `LIQUIDATION_PRECISION` constant.
+    function getLiquidationPrecision() external pure returns (uint256) {
+        return LIQUIDATION_PRECISION;
+    }
+
+    /// @return The `ADDITIONAL_FEED_PRECISION` constant.
+    function getAdditionaFeedPrecision() external pure returns (uint256) {
+        return ADDITIONAL_FEED_PRECISION;
+    }
+
+    /// @return The `PRECISION` constant.
+    function getPrecision() external pure returns (uint256) {
+        return PRECISION;
+    }
+
+    /// @return Address of the DSC contract.
+    function getDSC() external view returns (address) {
+        return address(i_dsc);
+    }
+
     /*//////////////////////////////////////////////////////////////
-                           INTERNAL FUNCTIONS
+                       INTERNAL & PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @param amount Amount of DSC to burn
@@ -364,27 +404,26 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    /// @param user The user's address.
-    /// @return totalDSCMinted Total DSC minted by the user.
-    /// @return collateralValueInUSD Total collateral value in USD.
-    function _getAccountInformation(
-        address user
-    ) internal view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
-        totalDSCMinted = dscMinted[user];
-        collateralValueInUSD = getAccountCollateralValue(user);
-        return (totalDSCMinted, collateralValueInUSD);
-    }
-
     /// @dev Calculates the health factor of a user's account in the DSCEngine contract.
     /// @notice The health factor indicates how close the user is to liquidation.
     /// A health factor below 1 signifies the user is eligible for liquidation.
+    /// @param totalDSCMinted Total DSC minted by the user.
+    /// @param collateralValueInUSD The total collateral value in USD
+    /// @return healthFactor The calculated health factor.
+    function _calculateHealthFactor(
+        uint256 totalDSCMinted,
+        uint256 collateralValueInUSD
+    ) internal pure returns (uint256 healthFactor) {
+        if (totalDSCMinted == 0) return type(uint256).max;
+        uint256 collateralAdjustedForThreshold = (collateralValueInUSD * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+        return healthFactor = (collateralAdjustedForThreshold * PRECISION) / totalDSCMinted;
+    }
+
     /// @param user The address of the user account.
     /// @return healthFactor The calculated health factor.
     function _healthFactor(address user) internal view returns (uint256 healthFactor) {
         (uint256 totalDSCMinted, uint256 collateralValueInUSD) = _getAccountInformation(user);
-        if (totalDSCMinted == 0) return type(uint256).max;
-        uint256 collateralAdjustedForThreshold = (collateralValueInUSD * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
-        return healthFactor = (collateralAdjustedForThreshold * PRECISION) / totalDSCMinted;
+        return healthFactor = _calculateHealthFactor(totalDSCMinted, collateralValueInUSD);
     }
 
     /// @param user User address to ensure it meets the minimum health factor.
@@ -394,6 +433,17 @@ contract DSCEngine is ReentrancyGuard {
         if (userHealthFactor < MIN_HEALTH_FACTOR) {
             revert DSCEngine__BreaksHealthFactor();
         }
+    }
+
+    /// @param user The user's address.
+    /// @return totalDSCMinted Total DSC minted by the user.
+    /// @return collateralValueInUSD Total collateral value in USD.
+    function _getAccountInformation(
+        address user
+    ) internal view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
+        totalDSCMinted = dscMinted[user];
+        collateralValueInUSD = getAccountCollateralValue(user);
+        return (totalDSCMinted, collateralValueInUSD);
     }
 
     /*//////////////////////////////////////////////////////////////
