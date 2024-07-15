@@ -108,6 +108,9 @@ contract DSCEngine is ReentrancyGuard {
     /// @dev Emitted if health factor is not improved to minimum after liquidation.
     error DSCEngine__HealthFactorNotImproved();
 
+    /// @dev Emitted if a user attempts to burn more than they have
+    error DSCEngine__InsufficientBalanceToBurn();
+
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
@@ -203,6 +206,16 @@ contract DSCEngine is ReentrancyGuard {
         redeemCollateral(tokenCollateralAddress, amountCollateral);
     }
 
+    /// @param amount Amount of DSC to burn.
+    /// @notice Calls burn function from the DefiStableCoin contract.
+    function burnDSC(uint256 amount) public moreThanZero(amount) {
+        if (dscMinted[msg.sender] < amount) {
+            revert DSCEngine__InsufficientBalanceToBurn();
+        }
+        _burnDSC(amount, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
     /// @param tokenCollateralAddress Address of the collateral to redeem.
     /// @param amountCollateral Amount of collateral to redeem.
     /// @notice If statment should be unreachable as the IERC20 should revert on transfer fail.
@@ -211,13 +224,6 @@ contract DSCEngine is ReentrancyGuard {
         uint256 amountCollateral
     ) public moreThanZero(amountCollateral) nonReentrant {
         _redeemCollateral(msg.sender, msg.sender, tokenCollateralAddress, amountCollateral);
-        _revertIfHealthFactorIsBroken(msg.sender);
-    }
-
-    /// @param amount Amount of DSC to burn.
-    /// @notice Calls burn function from the DefiStableCoin contract.
-    function burnDSC(uint256 amount) public moreThanZero(amount) {
-        _burnDSC(amount, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
@@ -324,6 +330,20 @@ contract DSCEngine is ReentrancyGuard {
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @param amount Amount of DSC to burn
+    /// @param onBehalfOf Address of user that will have their DSC returned.
+    /// @param dscFrom Address of user that will have their DSC burnt.
+    /// @dev Low-level internal function. Do not call unless the calling function is checking
+    /// for broken health factors.
+    function _burnDSC(uint256 amount, address onBehalfOf, address dscFrom) internal {
+        dscMinted[onBehalfOf] -= amount;
+        bool success = i_dsc.transferFrom(dscFrom, address(this), amount);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        i_dsc.burn(amount);
+    }
+
     /// @param from Address to have the collateral redeemed from.
     /// @param to Address to have the collateral redeemed to.
     /// @param tokenCollateralAddress Address of the collateral to redeem.
@@ -344,20 +364,6 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    /// @param amount Amount of DSC to burn
-    /// @param onBehalfOf Address of user that will have their DSC returned.
-    /// @param dscFrom Address of user that will have their DSC burnt.
-    /// @dev Low-level internal function. Do not call unless the calling function is checking
-    /// for broken health factors.
-    function _burnDSC(uint256 amount, address onBehalfOf, address dscFrom) internal {
-        dscMinted[onBehalfOf] -= amount;
-        bool success = i_dsc.transferFrom(dscFrom, address(this), amount);
-        if (!success) {
-            revert DSCEngine__TransferFailed();
-        }
-        i_dsc.burn(amount);
-    }
-
     /// @param user The user's address.
     /// @return totalDSCMinted Total DSC minted by the user.
     /// @return collateralValueInUSD Total collateral value in USD.
@@ -376,6 +382,7 @@ contract DSCEngine is ReentrancyGuard {
     /// @return healthFactor The calculated health factor.
     function _healthFactor(address user) internal view returns (uint256 healthFactor) {
         (uint256 totalDSCMinted, uint256 collateralValueInUSD) = _getAccountInformation(user);
+        if (totalDSCMinted == 0) return type(uint256).max;
         uint256 collateralAdjustedForThreshold = (collateralValueInUSD * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
         return healthFactor = (collateralAdjustedForThreshold * PRECISION) / totalDSCMinted;
     }

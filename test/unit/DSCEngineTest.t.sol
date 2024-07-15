@@ -2,8 +2,9 @@
 pragma solidity ^0.8.20;
 
 import { Ownable } from '@openzeppelin/contracts/access/Ownable.sol';
-import { Test } from 'forge-std/Test.sol';
+import { Test, console } from 'forge-std/Test.sol';
 import { ERC20Mock } from 'test/mocks/ERC20Mock.sol';
+import { MockV3Aggregator } from 'test/mocks/MockV3Aggregator.sol';
 import { DefiStableCoin } from 'src/DefiStableCoin.sol';
 import { DSCEngine } from 'src/DSCEngine.sol';
 import { DeployDSCEngine } from 'script/DeployDSCEngine.s.sol';
@@ -15,25 +16,25 @@ contract DSCEngineTest is Test {
     DSCEngine public dscEngine;
     HelperConfig public config;
 
-    address public ethUSDPricefeed;
-    address public btcUSDPricefeed;
+    address public ethUSDPriceFeed;
+    address public btcUSDPriceFeed;
     address public wETH;
     address public wBTC;
 
     address[] public tokenAddresses;
     address[] public priceFeedAddresses;
     address public user = address(1);
-    uint256 public collateralAmount = 10 ether;
-    uint256 public mintAmount = 10 ether;
+    uint256 public collateralAmount = 20 ether;
+    uint256 public mintAmount = 10000 ether;
 
-    uint256 public constant STARTING_USER_BALANCE = 10 ether;
+    uint256 public constant STARTING_USER_BALANCE = 20 ether;
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
 
     function setUp() public {
         deployer = new DeployDSCEngine();
         (dsc, dscEngine, config) = deployer.run(DEFAULT_SENDER);
-        (ethUSDPricefeed, btcUSDPricefeed, wETH, wBTC) = config.activeNetworkConfig();
+        (ethUSDPriceFeed, btcUSDPriceFeed, wETH, wBTC) = config.activeNetworkConfig();
         vm.deal(user, STARTING_USER_BALANCE);
         ERC20Mock(wETH).mint(user, STARTING_USER_BALANCE);
         ERC20Mock(wBTC).mint(user, STARTING_USER_BALANCE);
@@ -44,7 +45,7 @@ contract DSCEngineTest is Test {
     //////////////////////////////////////////////////////////////*/
     function test_RevertsWhen_ArgumentArraysAreNotSameLength() public {
         tokenAddresses = [wETH, wBTC];
-        priceFeedAddresses = [ethUSDPricefeed];
+        priceFeedAddresses = [ethUSDPriceFeed];
         vm.expectRevert(DSCEngine.DSCEngine__ArraysMustBeSameLength.selector);
         new DSCEngine(tokenAddresses, priceFeedAddresses, address(dsc));
     }
@@ -55,7 +56,7 @@ contract DSCEngineTest is Test {
     }
 
     function test_SetsPriceFeedAddressArrayProperly() public {
-        priceFeedAddresses = [ethUSDPricefeed, btcUSDPricefeed];
+        priceFeedAddresses = [ethUSDPriceFeed, btcUSDPriceFeed];
         assertEq(priceFeedAddresses[0], dscEngine.getPriceFeedAddress(wETH));
         assertEq(priceFeedAddresses[1], dscEngine.getPriceFeedAddress(wBTC));
     }
@@ -64,7 +65,15 @@ contract DSCEngineTest is Test {
                     DEPOSIT COLLATERAL AND MINT DSC
     //////////////////////////////////////////////////////////////*/
 
-    function test_DepositsCollateralToContractAndMintsDSCToUser() public depositCollateral mintDSC {
+    modifier depositCollateralAndMintDSC() {
+        vm.startPrank(user);
+        ERC20Mock(wETH).approve(address(dscEngine), collateralAmount);
+        dscEngine.depositCollateralAndMintDSC(wETH, collateralAmount, mintAmount);
+        vm.stopPrank();
+        _;
+    }
+
+    function test_DepositsCollateralToContractAndMintsDSCToUser() public depositCollateralAndMintDSC {
         uint256 userBalance = dsc.balanceOf(user);
         uint256 contractBalance = ERC20Mock(wETH).balanceOf(address(dscEngine));
         assertEq(userBalance, mintAmount);
@@ -114,7 +123,7 @@ contract DSCEngineTest is Test {
         assertEq(contractBalance, collateralAmount);
     }
 
-    function test_RevertsWhen_TransferFails() public {}
+    function test_RevertsWhen_DepositTransferFails() public {}
 
     /*//////////////////////////////////////////////////////////////
                                 MINT DSC
@@ -132,16 +141,16 @@ contract DSCEngineTest is Test {
         dscEngine.mintDSC(0);
     }
 
-    function test_SetsUserDSCMintedProperly() public depositCollateral mintDSC {
+    function test_SetsUserDSCMintedProperly() public depositCollateralAndMintDSC {
         uint256 userDSCMinted = dscEngine.getDSCMinted(user);
-        assertEq(userDSCMinted, collateralAmount);
+        assertEq(userDSCMinted, mintAmount);
     }
 
     function test_RevertsIf_HealthFactorIsBroken() public depositCollateral {}
 
-    function test_MintsCorrectAmountToUsersAddress() public depositCollateral mintDSC {
+    function test_MintsCorrectAmountToUsersAddress() public depositCollateralAndMintDSC {
         uint256 userBalance = dsc.balanceOf(user);
-        assertEq(userBalance, collateralAmount);
+        assertEq(userBalance, mintAmount);
     }
 
     function test_RevertsWhen_MintFails() public depositCollateral {}
@@ -151,12 +160,26 @@ contract DSCEngineTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     /*//////////////////////////////////////////////////////////////
+                                BURN DSC
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SetsDSCMintedOfUserHavingDSCBurntOnBehalfOfToCorrectAmount() public depositCollateralAndMintDSC {
+        vm.startPrank(user);
+        dsc.approve(address(dscEngine), mintAmount);
+        dscEngine.burnDSC(mintAmount);
+        vm.stopPrank();
+
+        uint256 userBalance = dsc.balanceOf(user);
+        assertEq(userBalance, 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                            REDEEM COLLATERAL
     //////////////////////////////////////////////////////////////*/
 
-    /*//////////////////////////////////////////////////////////////
-                                BURN DSC
-    //////////////////////////////////////////////////////////////*/
+    function test_SetsTheOriginalDepositersCollateralToCorrectAmount() public {}
+
+    function test_EmitsCollateralRedeemedEvent() public {}
 
     /*//////////////////////////////////////////////////////////////
                                LIQUIDATE
@@ -209,16 +232,47 @@ contract DSCEngineTest is Test {
                            GET HEALTH FACTOR
     //////////////////////////////////////////////////////////////*/
 
-    /*//////////////////////////////////////////////////////////////
-                           _REDEEM COLLATERAL
-    //////////////////////////////////////////////////////////////*/
+    function test_ReportsAccurateHealthFactor() public depositCollateralAndMintDSC {
+        uint256 userHealthFactor = dscEngine.getHealthFactor(user);
+        assertEq(userHealthFactor, 2e18);
+    }
+
+    function test_DisplayHealthFactorSequence() public depositCollateralAndMintDSC {
+        (uint256 totalDSCMinted, uint256 collateralValueInUSD) = dscEngine.getAccountInformation(user);
+        console.log(totalDSCMinted);
+        // totalDSCMinted = 10000e18 (10000 DSC)
+        console.log(collateralValueInUSD);
+        // collateralValueInUSD = 40000e18 (20 ETH)
+        console.log((collateralValueInUSD * 50) / 100);
+        // collateralAdjustForThreshold = 20000e18 (50%) Adjusted to ensure 2:1 ratio collateral to debt
+        console.log((((collateralValueInUSD * 50) / 100) * 1e18) / totalDSCMinted);
+        // healthFactor = 2e18
+    }
+
+    function test_HealthFactorCanGoBelowOne() public depositCollateralAndMintDSC {
+        int256 updatedETHPrice = 900e8;
+        MockV3Aggregator(ethUSDPriceFeed).updateAnswer(updatedETHPrice);
+        console.log(dscEngine.getAccountCollateralValue(user));
+
+        uint256 updatedUserHealthFactor = dscEngine.getHealthFactor(user);
+        console.log(updatedUserHealthFactor);
+
+        assertLt(updatedUserHealthFactor, 1e18);
+        assertEq(updatedUserHealthFactor, 0.9e18);
+    }
+
+    function test_RevertsWhen_HealthFactorIsBroken() public {
+        uint256 alternateMintAmount = 30000e18;
+        vm.startPrank(user);
+        ERC20Mock(wETH).approve(address(dscEngine), collateralAmount);
+        dscEngine.depositCollateral(wETH, collateralAmount);
+        vm.expectRevert(DSCEngine.DSCEngine__BreaksHealthFactor.selector);
+        dscEngine.mintDSC(alternateMintAmount);
+        vm.stopPrank();
+    }
 
     /*//////////////////////////////////////////////////////////////
-                               _BURN DSC
-    //////////////////////////////////////////////////////////////*/
-
-    /*//////////////////////////////////////////////////////////////
-                        _GET ACCOUNT INFORMATION
+                         GET ACCOUNT INFORMATION
     //////////////////////////////////////////////////////////////*/
 
     function test_RetrievesAccurateUserAccountInformation() public depositCollateral {
@@ -228,18 +282,4 @@ contract DSCEngineTest is Test {
         assertEq(totalDSCMinted, expectedDSCMinted);
         assertEq(collateralAmount, expectedTokenCollateralAmount);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                             _HEALTH FACTOR
-    //////////////////////////////////////////////////////////////*/
-
-    function test_ReportsAccurateHealthFactor() public {}
-
-    function test_HealthFactorCanGoBelowOne() public {}
-
-    /*//////////////////////////////////////////////////////////////
-                   _REVERT IF HEALTH FACTOR IS BROKEN
-    //////////////////////////////////////////////////////////////*/
-
-    function test_RevertsWhen_UserBreaksHealthFactor() public {}
 }
