@@ -213,20 +213,49 @@ contract DSCEngineTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                          GET COLLATERAL TOKEN
+                        GET COLLATERAL TOKENS
     //////////////////////////////////////////////////////////////*/
+
+    function test_GetsTheCorrectArrayOfAllowedCollateralTokens() public {
+        address[] memory collateralTokens = dscEngine.getCollateralTokens();
+        tokenAddresses = [wETH, wBTC];
+        assertEq(collateralTokens, tokenAddresses);
+    }
 
     /*//////////////////////////////////////////////////////////////
                          GET PRICE FEED ADDRESS
     //////////////////////////////////////////////////////////////*/
 
+    function test_GetsCorrectPriceFeedAddressForToken() public view {
+        address priceFeedAddress = dscEngine.getPriceFeedAddress(wETH);
+        assertEq(priceFeedAddress, ethUSDPriceFeed);
+    }
+
     /*//////////////////////////////////////////////////////////////
                         GET COLLATERAL DEPOSITED
     //////////////////////////////////////////////////////////////*/
 
+    function test_GetsCorrectAmountOfCollateralDepositedByTokenAndUser() public depositCollateralAndMintDSC {
+        uint256 wBTCDepositAmount = 10e18;
+        vm.startPrank(user);
+        ERC20Mock(wBTC).approve(address(dscEngine), wBTCDepositAmount);
+        dscEngine.depositCollateral(wBTC, wBTCDepositAmount);
+        vm.stopPrank();
+
+        uint256 wETHDeposited = dscEngine.getCollateralDeposited(user, wETH);
+        uint256 wBTCDeposited = dscEngine.getCollateralDeposited(user, wBTC);
+        assertEq(wETHDeposited, collateralAmount);
+        assertEq(wBTCDeposited, wBTCDepositAmount);
+    }
+
     /*//////////////////////////////////////////////////////////////
                              GET DSC MINTED
     //////////////////////////////////////////////////////////////*/
+
+    function test_GetsCorrectAmountOfDSCMintedbyUser() public depositCollateralAndMintDSC {
+        uint256 dscMinted = dscEngine.getDSCMinted(user);
+        assertEq(dscMinted, mintAmount);
+    }
 
     /*//////////////////////////////////////////////////////////////
                            GET HEALTH FACTOR
