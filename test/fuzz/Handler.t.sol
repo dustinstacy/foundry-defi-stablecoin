@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Test } from 'forge-std/Test.sol';
+import { Test, console } from 'forge-std/Test.sol';
 import { ERC20Mock } from '@openzeppelin/contracts/mocks/token/ERC20Mock.sol';
 import { DefiStableCoin } from 'src/DefiStableCoin.sol';
 import { DSCEngine } from 'src/DSCEngine.sol';
@@ -24,7 +24,7 @@ contract Handler is Test {
         wBTC = ERC20Mock(collateralTokens[1]);
     }
 
-    function depositCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
+    function mintAndDepositCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
         amountCollateral = bound(amountCollateral, 1, MAX_DEPOSIT_SIZE);
 
@@ -33,6 +33,17 @@ contract Handler is Test {
         collateral.approve(address(dscEngine), amountCollateral);
         dscEngine.depositCollateral(address(collateral), amountCollateral);
         vm.stopPrank();
+    }
+
+    function redeemCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
+        ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
+        uint256 maxCollateralToRedeem = dscEngine.getCollateralDeposited(msg.sender, address(collateral));
+        amountCollateral = bound(amountCollateral, 0, maxCollateralToRedeem);
+        if (amountCollateral == 0) {
+            vm.expectRevert(DSCEngine.DSCEngine__AmountMustBeMoreThanZero.selector);
+        }
+        vm.prank(msg.sender);
+        dscEngine.redeemCollateral(address(collateral), amountCollateral);
     }
 
     function _getCollateralFromSeed(uint256 collateralSeed) private view returns (ERC20Mock) {

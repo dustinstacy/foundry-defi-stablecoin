@@ -11,11 +11,11 @@ import { ERC20Mock } from 'test/mocks/ERC20Mock.sol';
 import { Handler } from 'test/fuzz/Handler.t.sol';
 
 contract Invariants is StdInvariant, Test {
-    DeployDSCEngine deployer;
-    DSCEngine dscEngine;
-    DefiStableCoin dsc;
-    HelperConfig config;
-    Handler handler;
+    DeployDSCEngine public deployer;
+    DSCEngine public dscEngine;
+    DefiStableCoin public dsc;
+    HelperConfig public config;
+    Handler public handler;
 
     address ethUSDPriceFeed;
     address btcUSDPriceFeed;
@@ -36,6 +36,7 @@ contract Invariants is StdInvariant, Test {
         uint256 totalWBTCDeposited = ERC20Mock(wBTC).balanceOf(address(dscEngine));
         uint256 wETHValue = dscEngine.getUSDValue(wETH, totalWETHDeposited);
         uint256 wBTCValue = dscEngine.getUSDValue(wBTC, totalWBTCDeposited);
+
         assert(wETHValue + wBTCValue >= totalSupply);
     }
 }
