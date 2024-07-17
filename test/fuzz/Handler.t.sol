@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { Test, console } from 'forge-std/Test.sol';
 import { ERC20Mock } from '@openzeppelin/contracts/mocks/token/ERC20Mock.sol';
+import { MockV3Aggregator } from 'test/mocks/MockV3Aggregator.sol';
 import { DefiStableCoin } from 'src/DefiStableCoin.sol';
 import { DSCEngine } from 'src/DSCEngine.sol';
 
@@ -12,6 +13,7 @@ contract Handler is Test {
 
     ERC20Mock wETH;
     ERC20Mock wBTC;
+    MockV3Aggregator public ethUSDPriceFeed;
 
     uint256 MAX_DEPOSIT_SIZE = type(uint96).max;
 
@@ -22,6 +24,8 @@ contract Handler is Test {
         address[] memory collateralTokens = dscEngine.getCollateralTokens();
         wETH = ERC20Mock(collateralTokens[0]);
         wBTC = ERC20Mock(collateralTokens[1]);
+
+        ethUSDPriceFeed = MockV3Aggregator(dscEngine.getPriceFeedAddress(address(wETH)));
     }
 
     function mintAndDepositCollateral(uint256 collateralSeed, uint256 amountCollateral) public {

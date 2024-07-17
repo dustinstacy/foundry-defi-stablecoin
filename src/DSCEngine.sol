@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import { ReentrancyGuard } from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import { AggregatorV3Interface } from '@chainlink/contracts/interfaces/AggregatorV3Interface.sol';
+import { Calculations } from './libraries/Calculations.sol';
 import { DefiStableCoin } from './DefiStableCoin.sol';
 
 /// @title DSCEngine
@@ -34,21 +34,6 @@ contract DSCEngine is ReentrancyGuard {
 
     /// @dev Instance of the DefiStableCoin contract used for interacting with the DSC token.
     DefiStableCoin private immutable i_dsc;
-
-    /// @dev Used to adjust decimals of price feed results.
-    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
-
-    /// @dev Used to adjust decimals to relative USD value.
-    uint256 private constant PRECISION = 1e18;
-
-    /// @dev Threshold percentage for triggering account liquidation.
-    uint256 private constant LIQUIDATION_THRESHOLD = 50;
-
-    /// @dev Precision factor used for calculating liquidation threshold percentage.
-    uint256 private constant LIQUIDATION_PRECISION = 100;
-
-    /// @dev Bonus percentage to be given to a user for liquidating another user.
-    uint256 private constant LIQUIDATION_BONUS = 10;
 
     /// @dev Minimum acceptable health factor to avoid liquidation.
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
@@ -132,7 +117,7 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                               FUNCTIONS
+                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /// @param tokenAddresses Array of collateral token addresses.
@@ -194,9 +179,10 @@ contract DSCEngine is ReentrancyGuard {
         if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
             revert DSCEngine__HealthFactorNotBroken();
         }
-        uint256 tokenAmountFromDebtCovered = getTokenAmountFromUSD(tokenCollateralAddress, debtToCover);
-        uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
-        uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
+        uint256 totalCollateralToRedeem = Calculations.calculateTotalCollateralToRedeem(
+            priceFeeds[tokenCollateralAddress],
+            debtToCover
+        );
         _redeemCollateral(user, msg.sender, tokenCollateralAddress, totalCollateralToRedeem);
         _burnDSC(debtToCover, user, msg.sender);
         uint256 endingUserHealthFactor = _healthFactor(user);
@@ -258,42 +244,9 @@ contract DSCEngine is ReentrancyGuard {
         for (uint256 i = 0; i < collateralTokens.length; i++) {
             address token = collateralTokens[i];
             uint256 amount = collateralDeposited[user][token];
-            totalCollateralValueInUSD += getUSDValue(token, amount);
+            totalCollateralValueInUSD += Calculations.calculateUSDValue(priceFeeds[token], amount);
         }
         return totalCollateralValueInUSD;
-    }
-
-    /// @dev Function to calculate the USD value of a given amount of collateral.
-    /// @notice Retrieves the latest price from the Chainlink price feed using `latestRoundData()`,
-    /// which returns a value with 8 decimals. To increase precision, `ADDITIONAL_FEED_PRECISION`
-    /// is used to scale the price to 18 decimals before dividing by `PRECISION` to obtain the USD value.
-    /// @param token The token address.
-    /// @param amount The amount of collateral tokens.
-    /// @return usdValue The USD value of the collateral amount.
-    function getUSDValue(address token, uint256 amount) public view returns (uint256 usdValue) {
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeeds[token]);
-        (, int256 price, , , ) = priceFeed.latestRoundData();
-        return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
-    }
-
-    /// @param token Address of token to get amount of based on USD value
-    /// @param usdAmountInWei USD value represented in <value>e18, adding 18 decimal places.
-    /// @return The quantity of tokens that a USD value would equal of the given token address.
-    function getTokenAmountFromUSD(address token, uint256 usdAmountInWei) public view returns (uint256) {
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(priceFeeds[token]);
-        (, int price, , , ) = priceFeed.latestRoundData();
-        return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
-    }
-
-    /// @notice Exposes the internal `_calculateHealthFactor`.
-    /// @param totalDSCMinted Total DSC minted by the user.
-    /// @param collateralValueInUSD The total collateral value in USD
-    /// @return healthFactor The calculated health factor.
-    function calculateHealthFactor(
-        uint256 totalDSCMinted,
-        uint256 collateralValueInUSD
-    ) external pure returns (uint256 healthFactor) {
-        return healthFactor = _calculateHealthFactor(totalDSCMinted, collateralValueInUSD);
     }
 
     /// @return Array of token addresses allowed as collateral.
@@ -333,31 +286,6 @@ contract DSCEngine is ReentrancyGuard {
         address user
     ) external view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
         return _getAccountInformation(user);
-    }
-
-    /// @return The `LIQUIDATION_THRESHOLD` constant
-    function getLiquidationThreshold() external pure returns (uint256) {
-        return LIQUIDATION_THRESHOLD;
-    }
-
-    /// @return The `LIQUIDATION_BONUS` constant
-    function getLiquidationBonus() external pure returns (uint256) {
-        return LIQUIDATION_BONUS;
-    }
-
-    /// @return The `LIQUIDATION_PRECISION` constant.
-    function getLiquidationPrecision() external pure returns (uint256) {
-        return LIQUIDATION_PRECISION;
-    }
-
-    /// @return The `ADDITIONAL_FEED_PRECISION` constant.
-    function getAdditionaFeedPrecision() external pure returns (uint256) {
-        return ADDITIONAL_FEED_PRECISION;
-    }
-
-    /// @return The `PRECISION` constant.
-    function getPrecision() external pure returns (uint256) {
-        return PRECISION;
     }
 
     /// @return Address of the DSC contract.
@@ -404,28 +332,6 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    /// @dev Calculates the health factor of a user's account in the DSCEngine contract.
-    /// @notice The health factor indicates how close the user is to liquidation.
-    /// A health factor below 1 signifies the user is eligible for liquidation.
-    /// @param totalDSCMinted Total DSC minted by the user.
-    /// @param collateralValueInUSD The total collateral value in USD
-    /// @return healthFactor The calculated health factor.
-    function _calculateHealthFactor(
-        uint256 totalDSCMinted,
-        uint256 collateralValueInUSD
-    ) internal pure returns (uint256 healthFactor) {
-        if (totalDSCMinted == 0) return type(uint256).max;
-        uint256 collateralAdjustedForThreshold = (collateralValueInUSD * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
-        return healthFactor = (collateralAdjustedForThreshold * PRECISION) / totalDSCMinted;
-    }
-
-    /// @param user The address of the user account.
-    /// @return healthFactor The calculated health factor.
-    function _healthFactor(address user) internal view returns (uint256 healthFactor) {
-        (uint256 totalDSCMinted, uint256 collateralValueInUSD) = _getAccountInformation(user);
-        return healthFactor = _calculateHealthFactor(totalDSCMinted, collateralValueInUSD);
-    }
-
     /// @param user User address to ensure it meets the minimum health factor.
     /// @notice Reverts the function calling this function if the user's health factor is below 1.
     function _revertIfHealthFactorIsBroken(address user) internal view {
@@ -433,6 +339,13 @@ contract DSCEngine is ReentrancyGuard {
         if (userHealthFactor < MIN_HEALTH_FACTOR) {
             revert DSCEngine__BreaksHealthFactor();
         }
+    }
+
+    /// @param user The address of the user account.
+    /// @return healthFactor The calculated health factor.
+    function _healthFactor(address user) internal view returns (uint256 healthFactor) {
+        (uint256 totalDSCMinted, uint256 collateralValueInUSD) = _getAccountInformation(user);
+        return healthFactor = Calculations.calculateHealthFactor(totalDSCMinted, collateralValueInUSD);
     }
 
     /// @param user The user's address.
@@ -445,8 +358,4 @@ contract DSCEngine is ReentrancyGuard {
         collateralValueInUSD = getAccountCollateralValue(user);
         return (totalDSCMinted, collateralValueInUSD);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                           PRIVATE FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
 }

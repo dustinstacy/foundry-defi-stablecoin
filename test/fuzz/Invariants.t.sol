@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { Test, console } from 'forge-std/Test.sol';
 import { StdInvariant } from 'forge-std/StdInvariant.sol';
+import { Calculations } from 'src/libraries/Calculations.sol';
 import { DeployDSCEngine } from 'script/DeployDSCEngine.s.sol';
 import { DSCEngine } from 'src/DSCEngine.sol';
 import { DefiStableCoin } from 'src/DefiStableCoin.sol';
@@ -34,9 +35,9 @@ contract Invariants is StdInvariant, Test {
         uint256 totalSupply = dsc.totalSupply();
         uint256 totalWETHDeposited = ERC20Mock(wETH).balanceOf(address(dscEngine));
         uint256 totalWBTCDeposited = ERC20Mock(wBTC).balanceOf(address(dscEngine));
-        uint256 wETHValue = dscEngine.getUSDValue(wETH, totalWETHDeposited);
-        uint256 wBTCValue = dscEngine.getUSDValue(wBTC, totalWBTCDeposited);
+        uint256 wETHValue = Calculations.calculateUSDValue(ethUSDPriceFeed, totalWETHDeposited);
+        uint256 wBTCValue = Calculations.calculateUSDValue(btcUSDPriceFeed, totalWBTCDeposited);
 
-        assert(wETHValue + wBTCValue >= totalSupply);
+        assertGe(wETHValue + wBTCValue, totalSupply);
     }
 }

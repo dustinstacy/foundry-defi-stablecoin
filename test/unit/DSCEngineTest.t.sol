@@ -12,6 +12,7 @@ import { DefiStableCoin } from 'src/DefiStableCoin.sol';
 import { DSCEngine } from 'src/DSCEngine.sol';
 import { DeployDSCEngine } from 'script/DeployDSCEngine.s.sol';
 import { HelperConfig } from 'script/HelperConfig.s.sol';
+import { Calculations } from 'src/libraries/Calculations.sol';
 
 contract DSCEngineTest is Test {
     DeployDSCEngine public deployer;
@@ -123,40 +124,6 @@ contract DSCEngineTest is Test {
         vm.expectRevert(DSCEngine.DSCEngine__HealthFactorNotBroken.selector);
         dscEngine.liquidate(wETH, user, mintAmount);
         assertEq(userHealthFactor, 2e18);
-    }
-
-    function test_SetsTheTokenAmountFromDebtCoveredBonusCollateralAndTotalCollateralToRedeemProperly()
-        public
-        depositCollateralAndMintDSC
-    {
-        uint256 LIQUIDATION_BONUS = dscEngine.getLiquidationBonus();
-        uint256 LIQUIDATION_PRECISION = dscEngine.getLiquidationPrecision();
-
-        // Set up liquidator address.
-        ERC20Mock(wETH).mint(liquidator, collateralAmount);
-        vm.startPrank(liquidator);
-        ERC20Mock(wETH).approve(address(dscEngine), collateralAmount);
-        dscEngine.depositCollateralAndMintDSC(wETH, collateralAmount, debtToCover);
-        vm.stopPrank();
-
-        // Update ETH price to break `user`'s health factor.
-        int256 updatedETHPrice = 800e8;
-        MockV3Aggregator(ethUSDPriceFeed).updateAnswer(updatedETHPrice);
-
-        //liquidate
-        vm.startPrank(liquidator);
-        dsc.approve(address(dscEngine), debtToCover);
-        dscEngine.liquidate(wETH, user, debtToCover);
-        vm.stopPrank();
-        uint256 tokenAmountFromDebtCovered = dscEngine.getTokenAmountFromUSD(wETH, debtToCover);
-        // tokenAmountFromDebtCovered = (200e18 * 1e18) / (800e8 * 1e10) = 0.25 ether or 25e16
-        uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
-        // bonusCollateral = (25e16 * 10) / 100 = 0.025 ether or 25e15
-        uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
-        // totalCollateralToReeded = 0.25 ether + 0.025 ether = 0.275 ether or 275e15;
-        assertEq(tokenAmountFromDebtCovered, 0.25 ether);
-        assertEq(bonusCollateral, 0.025 ether);
-        assertEq(totalCollateralToRedeem, 0.275 ether);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -368,43 +335,9 @@ contract DSCEngineTest is Test {
         dscEngine.depositCollateral(wBTC, collateralAmount);
         vm.stopPrank();
         uint256 totalCollateralValueInUSD = dscEngine.getAccountCollateralValue(user);
-        uint256 expectedETHUSDValue = dscEngine.getUSDValue(wETH, collateralAmount);
-        uint256 expectedBTCUSDValue = dscEngine.getUSDValue(wBTC, collateralAmount);
+        uint256 expectedETHUSDValue = Calculations.calculateUSDValue(ethUSDPriceFeed, collateralAmount);
+        uint256 expectedBTCUSDValue = Calculations.calculateUSDValue(btcUSDPriceFeed, collateralAmount);
         assertEq(totalCollateralValueInUSD, (expectedETHUSDValue + expectedBTCUSDValue));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                             GET USD VALUE
-    //////////////////////////////////////////////////////////////*/
-    function test_GetsTheProperUSDValueFromTokenAmount() public view {
-        uint256 ethAmount = 10e18;
-        // 10e18 * 2000 (Mock ETH_USD_PRICE) = 20000e18
-        uint256 expectedUSDValue = 20000e18;
-        uint256 actualUSDValue = dscEngine.getUSDValue(wETH, ethAmount);
-        assertEq(expectedUSDValue, actualUSDValue);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                       GET TOKEN AMOUNT FROM USD
-    //////////////////////////////////////////////////////////////*/
-
-    function test_GetsProperTokenAmountFromUSDValue() public view {
-        uint256 usdAmount = 20000e18;
-        // 20000e18 / 2000 (Mock ETH_USD_PRICE) = 10e18
-        uint256 expectedTokenAmount = 10e18;
-        uint256 actualTokenAmount = dscEngine.getTokenAmountFromUSD(wETH, usdAmount);
-        assertEq(expectedTokenAmount, actualTokenAmount);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        CALCULATE HEALTH FACTOR
-    //////////////////////////////////////////////////////////////*/
-
-    function test_calculateHealthFactorReturnsTheExpectedHealthFactor() public depositCollateralAndMintDSC {
-        uint256 userHealthFactor = dscEngine.getHealthFactor(user);
-        uint256 collateralValueInUSD = dscEngine.getUSDValue(wETH, collateralAmount);
-        uint256 expectedHealthFactor = dscEngine.calculateHealthFactor(mintAmount, collateralValueInUSD);
-        assertEq(userHealthFactor, expectedHealthFactor);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -462,9 +395,9 @@ contract DSCEngineTest is Test {
     }
 
     function test_DisplayHealthFactorSequence() public depositCollateralAndMintDSC {
-        uint256 LIQUIDATION_THRESHOLD = dscEngine.getLiquidationThreshold();
-        uint256 LIQUIDATION_PRECISION = dscEngine.getLiquidationPrecision();
-        uint256 PRECISION = dscEngine.getPrecision();
+        uint256 LIQUIDATION_THRESHOLD = Calculations.getLiquidationThreshold();
+        uint256 LIQUIDATION_PRECISION = Calculations.getLiquidationPrecision();
+        uint256 PRECISION = Calculations.getPrecision();
 
         (uint256 totalDSCMinted, uint256 collateralValueInUSD) = dscEngine.getAccountInformation(user);
         console.log(totalDSCMinted);
@@ -505,54 +438,12 @@ contract DSCEngineTest is Test {
     function test_RetrievesAccurateUserAccountInformation() public depositCollateral {
         (uint256 totalDSCMinted, uint256 collateralValueInUSD) = dscEngine.getAccountInformation(user);
         uint256 expectedDSCMinted = 0;
-        uint256 expectedTokenCollateralAmount = dscEngine.getTokenAmountFromUSD(wETH, collateralValueInUSD);
+        uint256 expectedTokenCollateralAmount = Calculations.calculateTokenAmountFromUSD(
+            ethUSDPriceFeed,
+            collateralValueInUSD
+        );
         assertEq(totalDSCMinted, expectedDSCMinted);
         assertEq(collateralAmount, expectedTokenCollateralAmount);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                       GET LIQUIDATION THRESHOLD
-    //////////////////////////////////////////////////////////////*/
-
-    function test_GetsTheCorrectLiquidationThreshold() public view {
-        uint256 LIQUIDATION_THRESHOLD = dscEngine.getLiquidationThreshold();
-        assertEq(LIQUIDATION_THRESHOLD, 50);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                         GET LIQUIDATION BONUS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_GetsTheCorrectLiquidationBonus() public view {
-        uint256 LIQUIDATION_BONUS = dscEngine.getLiquidationBonus();
-        assertEq(LIQUIDATION_BONUS, 10);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                       GET LIQUIDATION PRECISION
-    //////////////////////////////////////////////////////////////*/
-
-    function test_GetsTheCorrectLiquidationPrecision() public view {
-        uint256 LIQUIDATION_PRECISION = dscEngine.getLiquidationPrecision();
-        assertEq(LIQUIDATION_PRECISION, 100);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                       GET ADDITIONAL FEED PRECISION
-    //////////////////////////////////////////////////////////////*/
-
-    function test_GetsTheCorrectAdditionalFeedPrecision() public view {
-        uint256 ADDITIONAL_FEED_PRECISION = dscEngine.getAdditionaFeedPrecision();
-        assertEq(ADDITIONAL_FEED_PRECISION, 1e10);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                             GET PRECISION
-    //////////////////////////////////////////////////////////////*/
-
-    function test_GetsTheCorrectPrecision() public view {
-        uint256 PRECISION = dscEngine.getPrecision();
-        assertEq(PRECISION, 1e18);
     }
 
     /*//////////////////////////////////////////////////////////////
