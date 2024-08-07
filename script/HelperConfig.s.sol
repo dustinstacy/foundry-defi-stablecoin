@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Script } from 'forge-std/Script.sol';
-import { MockV3Aggregator } from 'test/mocks/MockV3Aggregator.sol';
-import { ERC20Mock } from 'test/mocks/ERC20Mock.sol';
+import {Script} from "forge-std/Script.sol";
+import {MockV3Aggregator} from "test/mocks/MockV3Aggregator.sol";
+import {ERC20Mock} from "test/mocks/ERC20Mock.sol";
 
 /// @title HelperConfig
 /// @notice Manages configuration settings and deployment of network-specific contracts
@@ -53,29 +53,27 @@ contract HelperConfig is Script {
         vm.startBroadcast();
         MockV3Aggregator ethUSDPriceFeed = new MockV3Aggregator(DECIMALS, ETH_USD_PRICE);
         MockV3Aggregator btcUSDPriceFeed = new MockV3Aggregator(DECIMALS, BTC_USD_PRICE);
-        ERC20Mock wETHMock = new ERC20Mock('Wrapped Ethereum', 'WETH', msg.sender, INITIAL_BALANCE);
-        ERC20Mock wBTCMock = new ERC20Mock('Wrapped BitCoin', 'WBTC', msg.sender, INITIAL_BALANCE);
+        ERC20Mock wETHMock = new ERC20Mock("Wrapped Ethereum", "WETH", msg.sender, INITIAL_BALANCE);
+        ERC20Mock wBTCMock = new ERC20Mock("Wrapped BitCoin", "WBTC", msg.sender, INITIAL_BALANCE);
         vm.stopBroadcast();
 
-        return
-            anvilNetworkConfig = NetworkConfig({
-                wETHUSDPriceFeed: address(ethUSDPriceFeed),
-                wBTCUSDPriceFeed: address(btcUSDPriceFeed),
-                wETH: address(wETHMock),
-                wBTC: address(wBTCMock)
-            });
+        return anvilNetworkConfig = NetworkConfig({
+            wETHUSDPriceFeed: address(ethUSDPriceFeed),
+            wBTCUSDPriceFeed: address(btcUSDPriceFeed),
+            wETH: address(wETHMock),
+            wBTC: address(wBTCMock)
+        });
     }
 
     /// @dev Retrieves the Sepolia network configuration, which includes
     /// specific addresses for production environment contracts.
     /// @return sepoliaNetworkConfig The Sepolia network configuration.
     function getSepoliaConfig() public pure returns (NetworkConfig memory sepoliaNetworkConfig) {
-        return
-            sepoliaNetworkConfig = NetworkConfig({
-                wETHUSDPriceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306,
-                wBTCUSDPriceFeed: 0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43,
-                wETH: 0xdd13E55209Fd76AfE204dBda4007C227904f0a81,
-                wBTC: 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063
-            });
+        return sepoliaNetworkConfig = NetworkConfig({
+            wETHUSDPriceFeed: 0x694AA1769357215DE4FAC081bf1f309aDC325306,
+            wBTCUSDPriceFeed: 0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43,
+            wETH: 0xdd13E55209Fd76AfE204dBda4007C227904f0a81,
+            wBTC: 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063
+        });
     }
 }

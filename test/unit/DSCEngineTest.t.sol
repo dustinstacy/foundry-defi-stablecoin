@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Ownable } from '@openzeppelin/contracts/access/Ownable.sol';
-import { Test, console } from 'forge-std/Test.sol';
-import { ERC20Mock } from 'test/mocks/ERC20Mock.sol';
-import { MockV3Aggregator } from 'test/mocks/MockV3Aggregator.sol';
-import { MockFailedTransferFrom } from 'test/mocks/MockFailedTransferFrom.sol';
-import { MockFailedTransfer } from 'test/mocks/MockFailedTransfer.sol';
-import { MockFailedMintDSC } from 'test/mocks/MockFailedMintDSC.sol';
-import { DefiStableCoin } from 'src/DefiStableCoin.sol';
-import { DSCEngine } from 'src/DSCEngine.sol';
-import { DeployDSCEngine } from 'script/DeployDSCEngine.s.sol';
-import { HelperConfig } from 'script/HelperConfig.s.sol';
-import { Calculations } from 'src/libraries/Calculations.sol';
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Test, console} from "forge-std/Test.sol";
+import {ERC20Mock} from "test/mocks/ERC20Mock.sol";
+import {MockV3Aggregator} from "test/mocks/MockV3Aggregator.sol";
+import {MockFailedTransferFrom} from "test/mocks/MockFailedTransferFrom.sol";
+import {MockFailedTransfer} from "test/mocks/MockFailedTransfer.sol";
+import {MockFailedMintDSC} from "test/mocks/MockFailedMintDSC.sol";
+import {DefiStableCoin} from "src/DefiStableCoin.sol";
+import {DSCEngine} from "src/DSCEngine.sol";
+import {DeployDSCEngine} from "script/DeployDSCEngine.s.sol";
+import {HelperConfig} from "script/HelperConfig.s.sol";
+import {Calculations} from "src/libraries/Calculations.sol";
 
 contract DSCEngineTest is Test {
     DeployDSCEngine public deployer;
@@ -27,8 +27,8 @@ contract DSCEngineTest is Test {
 
     address[] public tokenAddresses;
     address[] public priceFeedAddresses;
-    address public user = makeAddr('user');
-    address public liquidator = makeAddr('liquidator');
+    address public user = makeAddr("user");
+    address public liquidator = makeAddr("liquidator");
     uint256 public collateralAmount = 20 ether;
     uint256 public mintAmount = 10000 ether;
     uint256 public redeemAmount = 5 ether;
@@ -38,10 +38,7 @@ contract DSCEngineTest is Test {
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event CollateralRedeemed(
-        address indexed redeemedFrom,
-        address indexed redeemedTo,
-        address indexed token,
-        uint256 amount
+        address indexed redeemedFrom, address indexed redeemedTo, address indexed token, uint256 amount
     );
 
     function setUp() public {
@@ -144,7 +141,7 @@ contract DSCEngineTest is Test {
     }
 
     function test_RevertsIf_UnallowedTokenIsDeposited() public {
-        ERC20Mock invalidToken = new ERC20Mock('INVALID', 'INV', DEFAULT_SENDER, collateralAmount);
+        ERC20Mock invalidToken = new ERC20Mock("INVALID", "INV", DEFAULT_SENDER, collateralAmount);
         vm.expectRevert(DSCEngine.DSCEngine__TokenNotAllowed.selector);
         dscEngine.depositCollateral(address(invalidToken), collateralAmount);
     }
@@ -438,10 +435,8 @@ contract DSCEngineTest is Test {
     function test_RetrievesAccurateUserAccountInformation() public depositCollateral {
         (uint256 totalDSCMinted, uint256 collateralValueInUSD) = dscEngine.getAccountInformation(user);
         uint256 expectedDSCMinted = 0;
-        uint256 expectedTokenCollateralAmount = Calculations.calculateTokenAmountFromUSD(
-            ethUSDPriceFeed,
-            collateralValueInUSD
-        );
+        uint256 expectedTokenCollateralAmount =
+            Calculations.calculateTokenAmountFromUSD(ethUSDPriceFeed, collateralValueInUSD);
         assertEq(totalDSCMinted, expectedDSCMinted);
         assertEq(collateralAmount, expectedTokenCollateralAmount);
     }

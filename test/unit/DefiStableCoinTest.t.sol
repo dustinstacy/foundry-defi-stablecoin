@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Ownable } from '@openzeppelin/contracts/access/Ownable.sol';
-import { Test } from 'forge-std/Test.sol';
-import { DefiStableCoin } from 'src/DefiStableCoin.sol';
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Test} from "forge-std/Test.sol";
+import {DefiStableCoin} from "src/DefiStableCoin.sol";
 
 contract DefiStableCoinTest is Test {
     DefiStableCoin dsc;
 
-    address USER = makeAddr('user');
+    address USER = makeAddr("user");
     uint256 mintAmount = 20e18;
     uint256 burnAmount = 20e18;
 
@@ -21,8 +21,8 @@ contract DefiStableCoinTest is Test {
     /// Constructor
     ///
     function test_ConstructorSetsNameAndSymbolCorrectly() public view {
-        string memory expectedName = 'Defi StableCoin';
-        string memory expectedSymbol = 'DSC';
+        string memory expectedName = "Defi StableCoin";
+        string memory expectedSymbol = "DSC";
         assertEq(dsc.name(), expectedName);
         assertEq(dsc.symbol(), expectedSymbol);
     }

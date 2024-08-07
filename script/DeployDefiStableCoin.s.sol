@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { DefiStableCoin } from 'src/DefiStableCoin.sol';
-import { Script } from 'forge-std/Script.sol';
+import {DefiStableCoin} from "src/DefiStableCoin.sol";
+import {Script} from "forge-std/Script.sol";
 
 /// @title DeployDefiStableCoin
 /// @notice Script for deploying the DefiStableCoin contract.

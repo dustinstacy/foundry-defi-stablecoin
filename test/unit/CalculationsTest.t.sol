@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Test, console } from 'forge-std/Test.sol';
-import { ERC20Mock } from 'test/mocks/ERC20Mock.sol';
-import { MockV3Aggregator } from 'test/mocks/MockV3Aggregator.sol';
-import { DefiStableCoin } from 'src/DefiStableCoin.sol';
-import { DSCEngine } from 'src/DSCEngine.sol';
-import { DeployDSCEngine } from 'script/DeployDSCEngine.s.sol';
-import { HelperConfig } from 'script/HelperConfig.s.sol';
-import { Calculations } from 'src/libraries/Calculations.sol';
+import {Test, console} from "forge-std/Test.sol";
+import {ERC20Mock} from "test/mocks/ERC20Mock.sol";
+import {MockV3Aggregator} from "test/mocks/MockV3Aggregator.sol";
+import {DefiStableCoin} from "src/DefiStableCoin.sol";
+import {DSCEngine} from "src/DSCEngine.sol";
+import {DeployDSCEngine} from "script/DeployDSCEngine.s.sol";
+import {HelperConfig} from "script/HelperConfig.s.sol";
+import {Calculations} from "src/libraries/Calculations.sol";
 
 contract CalculationsTest is Test {
     DeployDSCEngine public deployer;
@@ -23,8 +23,8 @@ contract CalculationsTest is Test {
 
     address[] public tokenAddresses;
     address[] public priceFeedAddresses;
-    address public user = makeAddr('user');
-    address public liquidator = makeAddr('liquidator');
+    address public user = makeAddr("user");
+    address public liquidator = makeAddr("liquidator");
     uint256 public collateralAmount = 20 ether;
     uint256 public mintAmount = 10000 ether;
     uint256 public redeemAmount = 5 ether;
@@ -34,10 +34,7 @@ contract CalculationsTest is Test {
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event CollateralRedeemed(
-        address indexed redeemedFrom,
-        address indexed redeemedTo,
-        address indexed token,
-        uint256 amount
+        address indexed redeemedFrom, address indexed redeemedTo, address indexed token, uint256 amount
     );
 
     function setUp() public {
@@ -101,10 +98,8 @@ contract CalculationsTest is Test {
         // bonusCollateral = (25e16 * 10) / 100 = 0.025 ether or 25e15
         uint256 expectedTotalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
         // totalCollateralToReeded = 0.25 ether + 0.025 ether = 0.275 ether or 275e15;
-        uint256 actualTotalCollateralToRedeem = Calculations.calculateTotalCollateralToRedeem(
-            ethUSDPriceFeed,
-            debtToCover
-        );
+        uint256 actualTotalCollateralToRedeem =
+            Calculations.calculateTotalCollateralToRedeem(ethUSDPriceFeed, debtToCover);
         assertEq(tokenAmountFromDebtCovered, 0.25 ether);
         assertEq(bonusCollateral, 0.025 ether);
         assertEq(expectedTotalCollateralToRedeem, 0.275 ether);

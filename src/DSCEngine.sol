@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { ReentrancyGuard } from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import { Calculations } from './libraries/Calculations.sol';
-import { DefiStableCoin } from './DefiStableCoin.sol';
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Calculations} from "./libraries/Calculations.sol";
+import {DefiStableCoin} from "./DefiStableCoin.sol";
 
 /// @title DSCEngine
 /// @author Dustin Stacy
@@ -59,10 +59,7 @@ contract DSCEngine is ReentrancyGuard {
 
     /// @dev Emitted when collateral is redeemed.
     event CollateralRedeemed(
-        address indexed redeemedFrom,
-        address indexed redeemedTo,
-        address indexed token,
-        uint256 amount
+        address indexed redeemedFrom, address indexed redeemedTo, address indexed token, uint256 amount
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -157,11 +154,9 @@ contract DSCEngine is ReentrancyGuard {
     /// @notice This function burns DSC and redeems underlying collateral in one transaction
     /// @dev `burnDSC` and `redeemCollateral` both run checks to ensure amounts are not 0.
     /// @dev `redeemCollateral` will run a check to ensure user health factor is not broken.
-    function redeemCollateralForDSC(
-        address tokenCollateralAddress,
-        uint256 amountCollateral,
-        uint256 amountDSCToBurn
-    ) external {
+    function redeemCollateralForDSC(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDSCToBurn)
+        external
+    {
         burnDSC(amountDSCToBurn);
         redeemCollateral(tokenCollateralAddress, amountCollateral);
     }
@@ -170,19 +165,17 @@ contract DSCEngine is ReentrancyGuard {
     /// @param user Address of the user to liquidate based on broken health factor.
     /// @param debtToCover Amount of DSC to burn to cover debt.
     /// @notice You can partially liquidate a user.
-    function liquidate(
-        address tokenCollateralAddress,
-        address user,
-        uint256 debtToCover
-    ) external moreThanZero(debtToCover) nonReentrant {
+    function liquidate(address tokenCollateralAddress, address user, uint256 debtToCover)
+        external
+        moreThanZero(debtToCover)
+        nonReentrant
+    {
         uint256 startingUserHealthFactor = _healthFactor(user);
         if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
             revert DSCEngine__HealthFactorNotBroken();
         }
-        uint256 totalCollateralToRedeem = Calculations.calculateTotalCollateralToRedeem(
-            priceFeeds[tokenCollateralAddress],
-            debtToCover
-        );
+        uint256 totalCollateralToRedeem =
+            Calculations.calculateTotalCollateralToRedeem(priceFeeds[tokenCollateralAddress], debtToCover);
         _redeemCollateral(user, msg.sender, tokenCollateralAddress, totalCollateralToRedeem);
         _burnDSC(debtToCover, user, msg.sender);
         uint256 endingUserHealthFactor = _healthFactor(user);
@@ -194,10 +187,12 @@ contract DSCEngine is ReentrancyGuard {
 
     /// @param tokenCollateralAddress The address of the token to deposit as collateral.
     /// @param amountCollateral The amount of collateral to deposit.
-    function depositCollateral(
-        address tokenCollateralAddress,
-        uint256 amountCollateral
-    ) public moreThanZero(amountCollateral) isAllowedToken(tokenCollateralAddress) nonReentrant {
+    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        public
+        moreThanZero(amountCollateral)
+        isAllowedToken(tokenCollateralAddress)
+        nonReentrant
+    {
         collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
         emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
@@ -229,10 +224,11 @@ contract DSCEngine is ReentrancyGuard {
 
     /// @param tokenCollateralAddress Address of the collateral to redeem.
     /// @param amountCollateral Amount of collateral to redeem.
-    function redeemCollateral(
-        address tokenCollateralAddress,
-        uint256 amountCollateral
-    ) public moreThanZero(amountCollateral) nonReentrant {
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
+        public
+        moreThanZero(amountCollateral)
+        nonReentrant
+    {
         _redeemCollateral(msg.sender, msg.sender, tokenCollateralAddress, amountCollateral);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -282,9 +278,11 @@ contract DSCEngine is ReentrancyGuard {
     /// @param user User address to retrieve account information of.
     /// @return totalDSCMinted Total amount of DSC minted by the user.
     /// @return collateralValueInUSD Total value of all user collateral in USD.
-    function getAccountInformation(
-        address user
-    ) external view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
+    function getAccountInformation(address user)
+        external
+        view
+        returns (uint256 totalDSCMinted, uint256 collateralValueInUSD)
+    {
         return _getAccountInformation(user);
     }
 
@@ -318,12 +316,9 @@ contract DSCEngine is ReentrancyGuard {
     /// @notice If statment should be unreachable as the IERC20 should revert on transfer fail.
     /// @dev Low-level internal function. Do not call unless the calling function is checking
     /// for broken health factors.
-    function _redeemCollateral(
-        address from,
-        address to,
-        address tokenCollateralAddress,
-        uint256 amountCollateral
-    ) internal {
+    function _redeemCollateral(address from, address to, address tokenCollateralAddress, uint256 amountCollateral)
+        internal
+    {
         collateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
         emit CollateralRedeemed(from, to, tokenCollateralAddress, amountCollateral);
         bool success = IERC20(tokenCollateralAddress).transfer(to, amountCollateral);
@@ -351,9 +346,11 @@ contract DSCEngine is ReentrancyGuard {
     /// @param user The user's address.
     /// @return totalDSCMinted Total DSC minted by the user.
     /// @return collateralValueInUSD Total collateral value in USD.
-    function _getAccountInformation(
-        address user
-    ) internal view returns (uint256 totalDSCMinted, uint256 collateralValueInUSD) {
+    function _getAccountInformation(address user)
+        internal
+        view
+        returns (uint256 totalDSCMinted, uint256 collateralValueInUSD)
+    {
         totalDSCMinted = dscMinted[user];
         collateralValueInUSD = getAccountCollateralValue(user);
         return (totalDSCMinted, collateralValueInUSD);

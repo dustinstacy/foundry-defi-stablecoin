@@ -44,9 +44,7 @@ contract MockV3Aggregator {
         getStartedAt[latestRound] = _startedAt;
     }
 
-    function getRoundData(
-        uint80 _roundId
-    )
+    function getRoundData(uint80 _roundId)
         external
         view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
@@ -69,6 +67,6 @@ contract MockV3Aggregator {
     }
 
     function description() external pure returns (string memory) {
-        return 'v0.8/tests/MockV3Aggregator.sol';
+        return "v0.8/tests/MockV3Aggregator.sol";
     }
 }

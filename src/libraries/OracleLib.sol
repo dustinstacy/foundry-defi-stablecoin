@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { AggregatorV3Interface } from '@chainlink/contracts/interfaces/AggregatorV3Interface.sol';
+import {AggregatorV3Interface} from "@chainlink/contracts/interfaces/AggregatorV3Interface.sol";
 
 /// @title OracleLib
 /// @author Dustin Stacy
@@ -12,9 +12,7 @@ library OracleLib {
 
     uint256 private constant TIMEOUT = 3 hours;
 
-    function staleCheckLatestRoundData(
-        AggregatorV3Interface priceFeed
-    )
+    function staleCheckLatestRoundData(AggregatorV3Interface priceFeed)
         public
         view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)

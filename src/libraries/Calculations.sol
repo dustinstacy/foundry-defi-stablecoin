@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { AggregatorV3Interface } from '@chainlink/contracts/interfaces/AggregatorV3Interface.sol';
-import { OracleLib, AggregatorV3Interface } from './OracleLib.sol';
+import {AggregatorV3Interface} from "@chainlink/contracts/interfaces/AggregatorV3Interface.sol";
+import {OracleLib, AggregatorV3Interface} from "./OracleLib.sol";
 
 /// @title Calculations
 /// @author Dustin Stacy
@@ -39,10 +39,11 @@ library Calculations {
     /// @param totalDSCMinted Total DSC minted by the user.
     /// @param collateralValueInUSD The total collateral value in USD
     /// @return healthFactor The calculated health factor.
-    function calculateHealthFactor(
-        uint256 totalDSCMinted,
-        uint256 collateralValueInUSD
-    ) external pure returns (uint256 healthFactor) {
+    function calculateHealthFactor(uint256 totalDSCMinted, uint256 collateralValueInUSD)
+        external
+        pure
+        returns (uint256 healthFactor)
+    {
         if (totalDSCMinted == 0) return type(uint256).max;
         uint256 collateralAdjustedForThreshold = (collateralValueInUSD * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
         return healthFactor = (collateralAdjustedForThreshold * PRECISION) / totalDSCMinted;
@@ -51,10 +52,11 @@ library Calculations {
     /// @notice Calulcates the liquidators redemption amount based on debt covered and the liquidation bonus.
     /// @param tokenPriceFeed Price feed address of the token collateral to redeem.
     /// @param debtToCover Amount of debt the liquidator is covering.
-    function calculateTotalCollateralToRedeem(
-        address tokenPriceFeed,
-        uint256 debtToCover
-    ) external view returns (uint256 totalCollateralToRedeem) {
+    function calculateTotalCollateralToRedeem(address tokenPriceFeed, uint256 debtToCover)
+        external
+        view
+        returns (uint256 totalCollateralToRedeem)
+    {
         uint256 tokenAmountFromDebtCovered = calculateTokenAmountFromUSD(tokenPriceFeed, debtToCover);
         uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
         return totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
@@ -69,16 +71,20 @@ library Calculations {
     /// @return usdValue The USD value of the collateral amount.
     function calculateUSDValue(address tokenPriceFeed, uint256 amount) external view returns (uint256 usdValue) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(tokenPriceFeed);
-        (, int256 price, , , ) = priceFeed.staleCheckLatestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
     }
 
     /// @param tokenPriceFeed Address of token price feed to get amount of based on USD value
     /// @param usdAmountInWei USD value represented in <value>e18, adding 18 decimal places.
     /// @return The quantity of tokens that a USD value would equal of the given token address.
-    function calculateTokenAmountFromUSD(address tokenPriceFeed, uint256 usdAmountInWei) public view returns (uint256) {
+    function calculateTokenAmountFromUSD(address tokenPriceFeed, uint256 usdAmountInWei)
+        public
+        view
+        returns (uint256)
+    {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(tokenPriceFeed);
-        (, int price, , , ) = priceFeed.staleCheckLatestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
         return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
 

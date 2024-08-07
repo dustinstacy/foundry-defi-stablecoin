@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Test, console } from 'forge-std/Test.sol';
-import { StdInvariant } from 'forge-std/StdInvariant.sol';
-import { Calculations } from 'src/libraries/Calculations.sol';
-import { DeployDSCEngine } from 'script/DeployDSCEngine.s.sol';
-import { DSCEngine } from 'src/DSCEngine.sol';
-import { DefiStableCoin } from 'src/DefiStableCoin.sol';
-import { HelperConfig } from 'script/HelperConfig.s.sol';
-import { ERC20Mock } from 'test/mocks/ERC20Mock.sol';
-import { Handler } from 'test/fuzz/Handler.t.sol';
+import {Test, console} from "forge-std/Test.sol";
+import {StdInvariant} from "forge-std/StdInvariant.sol";
+import {Calculations} from "src/libraries/Calculations.sol";
+import {DeployDSCEngine} from "script/DeployDSCEngine.s.sol";
+import {DSCEngine} from "src/DSCEngine.sol";
+import {DefiStableCoin} from "src/DefiStableCoin.sol";
+import {HelperConfig} from "script/HelperConfig.s.sol";
+import {ERC20Mock} from "test/mocks/ERC20Mock.sol";
+import {Handler} from "test/fuzz/Handler.t.sol";
 
 contract Invariants is StdInvariant, Test {
     DeployDSCEngine public deployer;
